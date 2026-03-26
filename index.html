@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LDVELH - Livre Dont Vous Êtes Le Héros</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ÉCRAN D'ACCUEIL -->
+    <div id="screen-home" class="screen active">
+        <div class="home-container">
+            <div class="title-banner">
+                <h1>Livre Dont Vous Êtes<br>Le Héros</h1>
+                <p class="subtitle">Compagnon d'Aventure</p>
+            </div>
+            <div class="home-buttons">
+                <button id="btn-new-game" class="btn btn-primary btn-large">
+                    <span class="btn-icon">&#9876;</span> Nouvelle Partie
+                </button>
+                <button id="btn-load-game" class="btn btn-secondary btn-large">
+                    <span class="btn-icon">&#128214;</span> Charger une Partie
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÉCRAN CHOIX TYPE D'AVENTURE -->
+    <div id="screen-adventure-select" class="screen">
+        <div class="panel">
+            <h2>Choisissez votre Type d'Aventure</h2>
+            <div class="adventure-grid" id="adventure-grid"></div>
+            <button class="btn btn-back" id="btn-back-home">&larr; Retour</button>
+        </div>
+    </div>
+
+    <!-- ÉCRAN CRÉATION DE PERSONNAGE -->
+    <div id="screen-char-create" class="screen">
+        <div class="panel">
+            <h2 id="char-create-title">Création du Personnage</h2>
+            <div id="char-create-info" class="adventure-info"></div>
+
+            <div class="form-group">
+                <label for="hero-name">Nom du Héros</label>
+                <input type="text" id="hero-name" placeholder="Entrez le nom de votre héros..." maxlength="40">
+            </div>
+            <div class="form-group">
+                <label for="book-title">Titre du Livre (optionnel)</label>
+                <input type="text" id="book-title" placeholder="Ex: Le Sorcier de la Montagne de Feu" maxlength="80">
+            </div>
+
+            <div id="stats-creation" class="stats-creation"></div>
+
+            <div class="form-actions">
+                <button class="btn btn-back" id="btn-back-adventure">&larr; Retour</button>
+                <button class="btn btn-primary" id="btn-start-adventure">Commencer l'Aventure &#9876;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÉCRAN PRINCIPAL DU JEU -->
+    <div id="screen-game" class="screen">
+        <header class="game-header">
+            <div class="header-left">
+                <span id="game-hero-name" class="hero-name-display"></span>
+                <span id="game-book-title" class="book-title-display"></span>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-small btn-save" id="btn-save">&#128190; Sauver</button>
+                <button class="btn btn-small btn-menu" id="btn-game-menu">&#9776;</button>
+            </div>
+        </header>
+
+        <!-- Navigation par onglets -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="tab-stats">Personnage</button>
+            <button class="tab-btn" data-tab="tab-combat">Combat</button>
+            <button class="tab-btn" data-tab="tab-inventory">Inventaire</button>
+            <button class="tab-btn" data-tab="tab-notes">Notes</button>
+        </nav>
+
+        <!-- TAB: Personnage / Stats -->
+        <div id="tab-stats" class="tab-content active">
+            <div class="stats-panel" id="game-stats-panel"></div>
+
+            <!-- Section spéciale (Métamorphose, Magie, etc.) -->
+            <div id="special-section" class="special-section hidden"></div>
+
+            <!-- Paragraphe actuel -->
+            <div class="current-paragraph">
+                <label for="current-para">Paragraphe actuel</label>
+                <div class="para-controls">
+                    <input type="number" id="current-para" min="1" value="1" placeholder="§">
+                    <button class="btn btn-small" id="btn-para-history" title="Historique">&#128337;</button>
+                </div>
+            </div>
+
+            <!-- Alertes / Status -->
+            <div class="alerts-section">
+                <h3>Alertes & Statuts</h3>
+                <div id="alerts-list" class="alerts-list"></div>
+                <div class="alert-add">
+                    <input type="text" id="alert-input" placeholder="Ajouter une alerte ou statut...">
+                    <select id="alert-type">
+                        <option value="warning">&#9888; Alerte</option>
+                        <option value="info">&#8505; Info</option>
+                        <option value="danger">&#9760; Danger</option>
+                        <option value="success">&#10004; Bonus</option>
+                    </select>
+                    <button class="btn btn-small" id="btn-add-alert">+</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Combat -->
+        <div id="tab-combat" class="tab-content">
+            <div class="combat-zone">
+                <h3>Zone de Combat</h3>
+
+                <!-- Adversaires -->
+                <div class="adversaries-section">
+                    <h4>Adversaires</h4>
+                    <div id="adversaries-list" class="adversaries-list"></div>
+                    <div class="add-adversary">
+                        <input type="text" id="adv-name" placeholder="Nom" class="input-sm">
+                        <input type="number" id="adv-skill" placeholder="HAB" class="input-xs" min="1">
+                        <input type="number" id="adv-stamina" placeholder="END" class="input-xs" min="1">
+                        <button class="btn btn-small btn-primary" id="btn-add-adversary">+ Ajouter</button>
+                    </div>
+                </div>
+
+                <!-- Boutons de combat -->
+                <div class="combat-actions">
+                    <button class="btn btn-primary btn-combat" id="btn-attack" disabled>&#9876; Attaquer</button>
+                    <button class="btn btn-secondary btn-combat" id="btn-test-luck-combat" disabled>&#127808; Tenter sa Chance</button>
+                    <button class="btn btn-combat" id="btn-flee" disabled>&#127939; Fuir</button>
+                </div>
+
+                <!-- Log de combat -->
+                <div class="combat-log-container">
+                    <h4>Journal de Combat</h4>
+                    <div id="combat-log" class="combat-log"></div>
+                    <button class="btn btn-small" id="btn-clear-combat-log">Effacer le journal</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Inventaire -->
+        <div id="tab-inventory" class="tab-content">
+            <div class="inventory-section">
+                <!-- Or -->
+                <div class="gold-section">
+                    <h3>&#129689; Or / Pièces</h3>
+                    <div class="gold-controls">
+                        <button class="btn btn-small" id="btn-gold-minus">-</button>
+                        <input type="number" id="gold-amount" value="0" min="0">
+                        <button class="btn btn-small" id="btn-gold-plus">+</button>
+                    </div>
+                </div>
+
+                <!-- Provisions -->
+                <div class="provisions-section">
+                    <h3>&#127838; Provisions</h3>
+                    <div class="provisions-controls">
+                        <button class="btn btn-small" id="btn-prov-minus">-</button>
+                        <input type="number" id="provisions-amount" value="10" min="0">
+                        <button class="btn btn-small" id="btn-prov-plus">+</button>
+                        <button class="btn btn-small btn-primary" id="btn-eat" title="Manger un repas (+4 END)">&#127838; Manger</button>
+                    </div>
+                </div>
+
+                <!-- Potions -->
+                <div class="potions-section">
+                    <h3>&#129514; Potions</h3>
+                    <div id="potions-list" class="potions-list"></div>
+                </div>
+
+                <!-- Objets -->
+                <div class="objects-section">
+                    <h3>&#127890; Objets</h3>
+                    <div id="objects-list" class="objects-list"></div>
+                    <div class="add-object">
+                        <input type="text" id="object-name" placeholder="Nom de l'objet" class="input-md">
+                        <input type="text" id="object-desc" placeholder="Description (optionnel)" class="input-md">
+                        <button class="btn btn-small btn-primary" id="btn-add-object">+ Ajouter</button>
+                    </div>
+                </div>
+
+                <!-- Objets spéciaux -->
+                <div id="special-items-section" class="special-items-section hidden">
+                    <h3 id="special-items-title">Objets Spéciaux</h3>
+                    <div id="special-items-list" class="objects-list"></div>
+                    <div class="add-object">
+                        <input type="text" id="special-item-name" placeholder="Nom" class="input-md">
+                        <button class="btn btn-small btn-primary" id="btn-add-special-item">+ Ajouter</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Notes -->
+        <div id="tab-notes" class="tab-content">
+            <div class="notes-section">
+                <h3>&#128221; Notes d'Aventure</h3>
+                <textarea id="game-notes" placeholder="Prenez vos notes ici... indices, choix importants, paragraphes à retenir..."></textarea>
+
+                <h3>&#128506; Historique des Paragraphes</h3>
+                <div id="para-history" class="para-history"></div>
+            </div>
+        </div>
+
+        <!-- Menu contextuel -->
+        <div id="game-menu-overlay" class="overlay hidden">
+            <div class="overlay-panel">
+                <h3>Menu</h3>
+                <button class="btn btn-full" id="btn-menu-save">&#128190; Sauvegarder</button>
+                <button class="btn btn-full" id="btn-menu-dice">&#127922; Lancer les Dés</button>
+                <button class="btn btn-full" id="btn-menu-test-luck">&#127808; Tenter sa Chance</button>
+                <button class="btn btn-full btn-danger" id="btn-menu-quit">&#128682; Quitter l'Aventure</button>
+                <button class="btn btn-full btn-back" id="btn-menu-close">Fermer</button>
+            </div>
+        </div>
+
+        <!-- Overlay résultat de dés -->
+        <div id="dice-overlay" class="overlay hidden">
+            <div class="overlay-panel dice-result-panel">
+                <div id="dice-display" class="dice-display"></div>
+                <div id="dice-result-text" class="dice-result-text"></div>
+                <button class="btn btn-primary" id="btn-dice-close">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÉCRAN CHARGEMENT -->
+    <div id="screen-load" class="screen">
+        <div class="panel">
+            <h2>Charger une Partie</h2>
+            <div id="saves-list" class="saves-list"></div>
+            <p id="no-saves" class="no-saves hidden">Aucune sauvegarde trouvée.</p>
+            <button class="btn btn-back" id="btn-back-home-load">&larr; Retour</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
