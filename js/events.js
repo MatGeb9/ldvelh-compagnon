@@ -149,7 +149,7 @@ const actions = {
     render.renderStats();
     if (wasDeath) modal.alert("Votre héros est mort ! Son endurance est tombée à 0.", 'Mort');
   },
-  'stat-delta-apply': (target) => {
+  'stat-delta-apply': async (target) => {
     const key = target.dataset.key;
     const input = document.querySelector(`.stat-delta-input[data-stat-key="${key}"]`);
     if (!input) return;
@@ -158,14 +158,47 @@ const actions = {
       input.focus();
       return;
     }
+    const game = state.game;
+    const current = game.stats[key];
+    const max = game.statsMax[key];
+    const newCurrent = current + delta;
+    const config = resolveConfig(game);
+    const statName = config.stats.find(s => s.key === key)?.name || key;
+
+    // Bonus permanent (épée magique, armure, etc.) : delta > 0 qui dépasse le max
+    if (delta > 0 && newCurrent > max) {
+      const choice = await modal.choice(
+        `${statName} : ${current} + ${delta} = ${newCurrent} dépasserait le maximum (${max}).\n\n` +
+        `Plafonner à ${max} = simple soin\n` +
+        `Bonus permanent = augmente aussi le max (objet magique)`,
+        [
+          { label: 'Annuler', value: null, class: 'btn-back' },
+          { label: `Plafonner à ${max}`, value: 'cap', class: 'btn-secondary' },
+          { label: `Bonus permanent (+${newCurrent - max})`, value: 'boost', class: 'btn-primary' },
+        ],
+        `Dépasser le maximum ?`
+      );
+      if (!choice) { input.focus(); return; }
+      if (choice === 'boost') {
+        game.statsMax[key] = newCurrent;
+        game.stats[key] = newCurrent;
+        toast(`${statName} : max +${newCurrent - max} (bonus permanent)`, 'success', 2200);
+      } else {
+        game.stats[key] = max;
+        toast(`${statName} : ${max}/${max} (plafonné)`, 'info', 1500);
+      }
+      input.value = '';
+      render.renderStats();
+      return;
+    }
+
+    // Cas standard
     const wasDeath = adjustStat(key, delta);
     input.value = '';
     render.renderStats();
     if (wasDeath) {
       modal.alert("Votre héros est mort ! Son endurance est tombée à 0.", 'Mort');
     } else {
-      const config = resolveConfig(state.game);
-      const statName = config.stats.find(s => s.key === key)?.name || key;
       toast(`${statName} : ${delta > 0 ? '+' : ''}${delta}`, delta < 0 ? 'warn' : 'success', 1500);
     }
   },
@@ -414,6 +447,7 @@ const actions = {
     const idx = parseInt(target.dataset.idx);
     state.game.targetedAdversaryIdx = idx;
     render.renderAdversaries();
+    render.updateCombatButtons();
   },
   'adv-stamina': (target) => {
     const idx = parseInt(target.dataset.idx);
