@@ -321,15 +321,31 @@ input:focus, select:focus, textarea:focus {
     min-width: 80px;
 }
 
-.stat-roll-row .stat-value {
+.stat-roll-row .stat-value,
+.stat-roll-row .stat-value-input {
     font-family: var(--font-title);
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     color: var(--red);
-    min-width: 40px;
+    min-width: 60px;
+    width: 60px;
     text-align: center;
+    background: var(--parchment-light);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 4px;
 }
 
-.stat-roll-row .btn {
+.stat-roll-row .stat-value-input:focus {
+    outline: 2px solid var(--gold);
+    outline-offset: 1px;
+}
+
+.stat-roll-row .btn[data-action="roll-stat"],
+.stat-roll-row .btn[data-action="remove-custom-stat"] {
+    margin-left: 0;
+}
+
+.stat-roll-row .btn[data-action="roll-stat"] {
     margin-left: auto;
 }
 

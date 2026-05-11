@@ -58,6 +58,19 @@ export function renderStatsCreation() {
     const row = document.createElement('div');
     row.className = 'stat-roll-row';
 
+    const valueInput = html`
+      <input type="number" class="input-xs stat-value-input" data-stat-value-key="${stat.key}"
+             value="${rolled ? rolled.total : ''}" placeholder="?" title="Valeur (modifiable)">
+    `;
+    const rollBtn = html`
+      <button class="btn btn-small btn-primary" data-action="roll-stat" data-key="${stat.key}" title="Lancer les dés">
+        ${raw('&#127922;')}
+      </button>
+    `;
+    const removeBtn = stat.isCustom
+      ? html`<button class="btn btn-small btn-danger" data-action="remove-custom-stat" data-key="${stat.key}" title="Supprimer">${raw('&#10006;')}</button>`
+      : '';
+
     if (stat.editable) {
       row.innerHTML = html`
         <input type="text" class="input-sm stat-custom-name" data-key="${stat.key}"
@@ -74,43 +87,63 @@ export function renderStatsCreation() {
           +<input type="number" class="input-xs" data-bonus-key="${stat.key}"
                   value="${stat.bonus}" min="0" max="30">
         </span>
-        <span class="stat-value">${rolled ? rolled.total : '?'}</span>
-        <button class="btn btn-small btn-primary" data-action="roll-stat" data-key="${stat.key}">
-          ${raw('&#127922;')} Lancer
-        </button>
+        ${raw(valueInput)}
+        ${raw(rollBtn)}
+        ${raw(removeBtn)}
       `;
     } else {
       row.innerHTML = html`
         <span class="stat-label">${stat.name}</span>
         <span class="stat-formula">(${formula})</span>
-        <span class="stat-value">${rolled ? rolled.total : '?'}</span>
-        <button class="btn btn-small btn-primary" data-action="roll-stat" data-key="${stat.key}">
-          ${raw('&#127922;')} Lancer
-        </button>
+        ${raw(valueInput)}
+        ${raw(rollBtn)}
       `;
     }
+
+    // Manual value entry → sync into rolledStats (treated as "rolled" with empty rolls array)
+    row.querySelector('.stat-value-input').addEventListener('input', (e) => {
+      const v = parseInt(e.target.value);
+      if (Number.isNaN(v)) delete state.rolledStats[stat.key];
+      else state.rolledStats[stat.key] = { rolls: [], total: v };
+    });
+
+    // For editable stats (custom adventure or user-added) — keep state synced on input
+    // so re-renders don't blow away the user's typing.
+    if (stat.editable) {
+      row.querySelector(`.stat-custom-name[data-key="${stat.key}"]`)?.addEventListener('input', (e) => {
+        stat.name = e.target.value;
+      });
+      row.querySelector(`[data-dice-key="${stat.key}"]`)?.addEventListener('change', (e) => {
+        stat.dice = parseInt(e.target.value);
+      });
+      row.querySelector(`[data-sides-key="${stat.key}"]`)?.addEventListener('change', (e) => {
+        stat.diceType = parseInt(e.target.value);
+      });
+      row.querySelector(`[data-bonus-key="${stat.key}"]`)?.addEventListener('input', (e) => {
+        stat.bonus = parseInt(e.target.value) || 0;
+      });
+    }
+
     container.appendChild(row);
   });
 
-  const allBtn = document.createElement('button');
-  allBtn.className = 'btn btn-secondary';
-  allBtn.style.marginTop = '0.5rem';
-  allBtn.dataset.action = 'roll-all';
-  allBtn.innerHTML = '&#127922; Tout Lancer';
-  container.appendChild(allBtn);
+  // "Tout Lancer" + "Ajouter caractéristique" — wrapped in a flex row
+  const actionsRow = document.createElement('div');
+  actionsRow.style.cssText = 'display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;';
+  actionsRow.innerHTML = `
+    <button class="btn btn-secondary" data-action="roll-all">&#127922; Tout Lancer</button>
+    <button class="btn btn-back" data-action="add-custom-stat" title="Ajouter une caractéristique personnalisée">+ Caractéristique</button>
+  `;
+  container.appendChild(actionsRow);
 }
 
 export function updateRolledStatDisplay(key, total) {
-  document.querySelectorAll('.stat-roll-row').forEach(row => {
-    const btn = row.querySelector(`[data-action="roll-stat"][data-key="${key}"]`);
-    if (btn) {
-      const valueSpan = row.querySelector('.stat-value');
-      valueSpan.textContent = total;
-      valueSpan.style.animation = 'none';
-      void valueSpan.offsetHeight;
-      valueSpan.style.animation = 'diceRoll 0.4s ease-out';
-    }
-  });
+  const input = document.querySelector(`.stat-value-input[data-stat-value-key="${key}"]`);
+  if (!input) return;
+  input.value = total;
+  input.style.animation = 'none';
+  void input.offsetHeight;
+  input.style.animation = 'diceRoll 0.4s ease-out';
 }
 
 // ──────────── Game screen ────────────

@@ -32,7 +32,8 @@ export function createGameState({ adventure, heroName, bookTitle, rolledStats, s
 
   const game = {
     adventureType: adventure.id,
-    adventureConfig: { ...adventure, stats: statDefs },
+    statDefs,                                                // persisted — supports custom/renamed stats across reloads
+    adventureConfig: { ...adventure, stats: statDefs },      // derived in-memory; stripped on save
     heroName,
     bookTitle,
     stats,

@@ -29,14 +29,31 @@ const actions = {
   'select-adventure': (target) => {
     const adv = getAdventureType(target.dataset.advId);
     if (!adv) return;
-    state.selectedAdventure = adv;
+    // Deep-clone stats so user customisations don't pollute the shared ADVENTURE_TYPES.
+    state.selectedAdventure = { ...adv, stats: adv.stats.map(s => ({ ...s })) };
     state.rolledStats = {};
     render.showScreen('screen-char-create');
-    render.renderCharCreate(adv);
+    render.renderCharCreate(state.selectedAdventure);
   },
   'roll-stat': (target) => rollOneStat(target.dataset.key),
   'roll-all': () => state.selectedAdventure.stats.forEach(s => rollOneStat(s.key)),
   'start-adventure': () => startAdventure(),
+  'add-custom-stat': () => {
+    const key = `custom_${Date.now()}`;
+    state.selectedAdventure.stats.push({
+      key,
+      name: 'Nouvelle caractéristique',
+      dice: 1, diceType: 6, bonus: 0,
+      editable: true, isCustom: true,
+    });
+    render.renderStatsCreation();
+  },
+  'remove-custom-stat': (target) => {
+    const key = target.dataset.key;
+    state.selectedAdventure.stats = state.selectedAdventure.stats.filter(s => s.key !== key);
+    delete state.rolledStats[key];
+    render.renderStatsCreation();
+  },
 
   // Tabs
   'tab': (target) => render.switchTab(target.dataset.tab),
@@ -381,10 +398,16 @@ async function usePotion(idx) {
 function loadGame(idx) {
   const saves = getSaves();
   if (idx < 0 || idx >= saves.length) return;
-  // Deep clone + always re-derive adventureConfig from the canonical types
   state.game = JSON.parse(JSON.stringify(saves[idx]));
+  // Rebuild adventureConfig from the canonical type + persisted statDefs.
+  // Backwards compat: old saves embedded full adventureConfig (pre-refactor).
   const advType = getAdventureType(state.game.adventureType);
-  if (advType) state.game.adventureConfig = advType;
+  const statDefs = state.game.statDefs
+    || (state.game.adventureConfig && state.game.adventureConfig.stats)
+    || (advType && advType.stats)
+    || [];
+  state.game.statDefs = statDefs;
+  state.game.adventureConfig = advType ? { ...advType, stats: statDefs } : { stats: statDefs };
   render.showScreen('screen-game');
   render.renderGameScreen();
 }
