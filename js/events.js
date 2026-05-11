@@ -435,6 +435,14 @@ const actions = {
     if (state.game) state.game.diceLog = [];
     render.renderDiceLog();
   },
+  'roll-2d6': () => {
+    if (!state.game) return;
+    const rolls = rollDice(2);
+    const total = rolls.reduce((s, v) => s + v, 0);
+    logDice({ rolls, modifier: 0, modifierLabel: '', total, label: 'Lancer 2D6 (combat)' });
+    render.showDiceRoll(rolls, '2D6 — utilisez le résultat comme vous voulez');
+    render.renderDiceLog();
+  },
   'toggle-combat-mode': (target) => {
     if (!state.game) return;
     state.game.combatMode = target.checked ? 'sequential' : 'simultaneous';
