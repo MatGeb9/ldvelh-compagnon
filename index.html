@@ -154,9 +154,20 @@
                     <input type="text" id="new-para-note" placeholder="Note (clé d'argent, piège, +2 END, …) — optionnel">
                     <div class="para-add-actions">
                         <button class="btn btn-primary" data-action="add-paragraph">+ Ajouter</button>
+                        <button class="btn btn-secondary" data-action="see-only-paragraph" title="Ajoute le nœud sur la carte sans le compter comme visite">+ Voir seulement</button>
+                        <button class="btn" data-action="undo-paragraph" title="Annule la dernière visite">&#x21B6; Undo</button>
                         <button class="btn btn-back" data-action="reset-para-input">Reset</button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Derniers lancers de dés -->
+            <div class="dice-log-section">
+                <div class="dice-log-header">
+                    <h3>&#127922; Derniers lancers</h3>
+                    <button class="btn btn-small" data-action="clear-dice-log" title="Effacer l'historique des lancers">Effacer</button>
+                </div>
+                <div id="dice-log-list" class="dice-log-list"></div>
             </div>
 
             <!-- Alertes / Status -->
@@ -179,7 +190,13 @@
         <!-- TAB: Combat -->
         <div id="tab-combat" class="tab-content">
             <div class="combat-zone">
-                <h3>Zone de Combat</h3>
+                <div class="combat-zone-header">
+                    <h3>Zone de Combat</h3>
+                    <label class="combat-mode-toggle">
+                        <input type="checkbox" id="combat-mode-toggle" data-action="toggle-combat-mode">
+                        <span title="Au lieu d'attaquer tous simultanément, attaquez un adversaire ciblé par round">Combat 1-vs-1</span>
+                    </label>
+                </div>
 
                 <!-- Adversaires -->
                 <div class="adversaries-section">
@@ -268,7 +285,10 @@
                 <h3>&#128221; Notes d'Aventure</h3>
                 <textarea id="game-notes" placeholder="Prenez vos notes ici... indices, choix importants, paragraphes à retenir..."></textarea>
 
-                <h3>&#128506; Historique des Paragraphes</h3>
+                <div class="para-history-header">
+                    <h3>&#128506; Historique des Paragraphes</h3>
+                    <input type="search" id="para-filter" data-action="filter-paragraphs" placeholder="🔍 Filtrer (numéro, note, sentiment...)" class="para-filter-input">
+                </div>
                 <div id="para-history" class="para-history"></div>
             </div>
         </div>
@@ -280,7 +300,8 @@
                 <button class="btn btn-small" data-action="map-zoom-out" title="Zoom −">−</button>
                 <button class="btn btn-small" data-action="map-fit" title="Recadrer">&#8676;</button>
                 <button class="btn btn-small btn-primary" data-action="map-relayout" title="Recalculer le placement">&#x21BB; Re-layout</button>
-                <span class="map-hint">Glisser pour bouger · pincer/molette pour zoomer · clic = sauter au § (nouvelle visite)</span>
+                <button class="btn btn-small" data-action="map-unlock-all" title="Libère toutes les positions épinglées">&#128274;&#65039; Tout libérer</button>
+                <span class="map-hint">Glisser fond = pan · glisser nœud = épingle sa position · pincer/molette = zoom · tap nœud = sauter au §</span>
             </div>
             <div id="map-canvas" class="map-canvas"></div>
         </div>

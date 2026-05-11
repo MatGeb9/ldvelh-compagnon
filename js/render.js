@@ -231,6 +231,7 @@ export function renderGameScreen() {
   renderAdversaries();
   renderInventory();
   renderParagraphs();
+  renderDiceLog();
   el('current-para').value = game.currentParagraph;
   el('game-notes').value = game.notes || '';
   el('gold-amount').value = game.gold;
@@ -258,8 +259,17 @@ export function renderStats() {
       <div class="stat-controls">
         <button class="btn btn-small" data-action="stat-adjust" data-key="${statDef.key}" data-delta="-1">-</button>
         <button class="btn btn-small" data-action="stat-adjust" data-key="${statDef.key}" data-delta="1">+</button>
+        <input type="number" class="stat-delta-input" data-stat-key="${statDef.key}" placeholder="±" inputmode="numeric" title="Saisir un delta (négatif = dégâts, positif = soin)">
+        <button class="btn btn-small btn-primary" data-action="stat-delta-apply" data-key="${statDef.key}" title="Appliquer">&#916;</button>
       </div>
     `;
+    // Submit-on-Enter for the quick delta input
+    card.querySelector('.stat-delta-input')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        card.querySelector('[data-action="stat-delta-apply"]')?.click();
+      }
+    });
     panel.appendChild(card);
   });
 }
@@ -405,6 +415,34 @@ export function renderAlerts() {
   });
 }
 
+// ──────────── Derniers lancers de dés (Personnage tab) ────────────
+
+export function renderDiceLog() {
+  const container = el('dice-log-list');
+  if (!container) return;
+  const log = state.game?.diceLog || [];
+  container.innerHTML = '';
+  if (log.length === 0) {
+    container.innerHTML = '<p class="para-empty">Aucun lancer enregistré.</p>';
+    return;
+  }
+  // Reverse: most recent first
+  [...log].reverse().forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'dice-log-row';
+    const sum = entry.rolls.reduce((s, v) => s + v, 0);
+    const formula = entry.modifier
+      ? `${entry.rolls.join('+')}=${sum} +${entry.modifierLabel || ''}${entry.modifier}`
+      : `${entry.rolls.join('+')}=${sum}`;
+    row.innerHTML = html`
+      <span class="dice-log-label">${entry.label || '—'}</span>
+      <span class="dice-log-formula">${formula}</span>
+      <span class="dice-log-total">${entry.total}</span>
+    `;
+    container.appendChild(row);
+  });
+}
+
 // ──────────── Paragraph history (rich) ────────────
 
 export function renderParagraphs() {
@@ -418,11 +456,13 @@ export function renderParagraphs() {
     return;
   }
 
+  const filter = (state.paragraphFilter || '').toLowerCase().trim();
   // Count run boundaries to label them
   let runNumber = 1;
   history.forEach((num, i) => {
     if (num === null) {
       runNumber++;
+      if (filter) return; // hide separators when filtering
       const sep = document.createElement('div');
       sep.className = 'para-run-separator';
       sep.innerHTML = html`<span>── Run ${runNumber} ──</span>`;
@@ -431,6 +471,11 @@ export function renderParagraphs() {
     }
     const meta = paragraphs[num] || { sentiment: 'neutral', note: '' };
     const sentiment = meta.sentiment || 'neutral';
+    // Filter: substring match in num OR note OR sentiment label
+    if (filter) {
+      const haystack = `${num} ${meta.note || ''} ${sentiment}`.toLowerCase();
+      if (!haystack.includes(filter)) return;
+    }
     const row = document.createElement('div');
     row.className = 'para-row';
     row.dataset.num = num;
@@ -455,14 +500,26 @@ export const renderParagraphHistory = renderParagraphs;
 export function renderAdversaries() {
   const list = el('adversaries-list');
   list.innerHTML = '';
-  (state.game?.adversaries || []).forEach((adv, i) => {
+  const game = state.game;
+  const isSequential = game?.combatMode === 'sequential';
+  const targetIdx = game?.targetedAdversaryIdx;
+  // Sync the checkbox state
+  const modeToggle = el('combat-mode-toggle');
+  if (modeToggle) modeToggle.checked = isSequential;
+
+  (game?.adversaries || []).forEach((adv, i) => {
+    const isTargeted = isSequential && targetIdx === i;
     const card = document.createElement('div');
-    card.className = `adversary-card ${adv.defeated ? 'defeated' : ''}`;
+    card.className = `adversary-card ${adv.defeated ? 'defeated' : ''} ${isTargeted ? 'targeted' : ''}`;
+    const targetBtn = isSequential && !adv.defeated
+      ? html`<button class="btn btn-small ${raw(isTargeted ? 'btn-primary' : '')}" data-action="target-adversary" data-idx="${i}" title="Cibler cet adversaire pour le prochain Attaquer">&#127919; ${raw(isTargeted ? 'Ciblé' : 'Cible')}</button>`
+      : '';
     card.innerHTML = html`
       <span class="adv-name">${adv.name}</span>
       <span class="adv-stat">HAB ${adv.skill}</span>
       <span class="adv-stat">END ${adv.stamina}/${adv.staminaMax}</span>
       <div class="adv-controls">
+        ${raw(targetBtn)}
         <button class="btn btn-small" data-action="adv-stamina" data-idx="${i}" data-delta="-2" title="-2 END">-2</button>
         <button class="btn btn-small" data-action="adv-stamina" data-idx="${i}" data-delta="2" title="+2 END">+2</button>
         <button class="btn btn-small btn-danger" data-action="adv-remove" data-idx="${i}" title="Retirer">${raw('&#10006;')}</button>
@@ -473,8 +530,15 @@ export function renderAdversaries() {
 }
 
 export function updateCombatButtons() {
-  const hasLive = (state.game?.adversaries || []).some(a => !a.defeated);
-  el('btn-attack').disabled = !hasLive;
+  const game = state.game;
+  const hasLive = (game?.adversaries || []).some(a => !a.defeated);
+  const isSequential = game?.combatMode === 'sequential';
+  const targetIdx = game?.targetedAdversaryIdx;
+  const targetAlive = isSequential && targetIdx != null
+    && game.adversaries[targetIdx] && !game.adversaries[targetIdx].defeated;
+  // In sequential mode, attack requires a valid living target
+  const canAttack = hasLive && (!isSequential || targetAlive);
+  el('btn-attack').disabled = !canAttack;
   el('btn-test-luck-combat').disabled = !hasLive;
   el('btn-flee').disabled = !hasLive;
 }

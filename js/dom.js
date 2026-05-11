@@ -72,6 +72,33 @@ function showModal({ title, message, buttons }) {
   });
 }
 
+// ──────────── Toast (non-blocking transient feedback) ────────────
+
+function ensureToastRoot() {
+  let root = el('toast-root');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'toast-root';
+    document.body.appendChild(root);
+  }
+  return root;
+}
+
+// Non-blocking flash message. type: 'info' | 'success' | 'warn' | 'error'
+export function toast(message, type = 'success', duration = 2500) {
+  const root = ensureToastRoot();
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = message;
+  root.appendChild(t);
+  // Animate in next tick
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 250);
+  }, duration);
+}
+
 export const modal = {
   alert(message, title = '') {
     return showModal({

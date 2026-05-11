@@ -1,11 +1,11 @@
 import { rollDice } from './dice.js';
-import { el, modal } from './dom.js';
-import { state, resolveConfig, resetCharCreate, createGameState, adjustStat, startNewRun } from './state.js';
+import { el, modal, toast } from './dom.js';
+import { state, resolveConfig, resetCharCreate, createGameState, adjustStat, startNewRun, logDice } from './state.js';
 import { getSaves, persistGame, removeSave, exportSaves, importSaves } from './save.js';
 import { getAdventureType } from './adventure-types.js';
 import * as combat from './combat.js';
 import * as render from './render.js';
-import { renderMap, zoomMapBy, fitMap, relayoutMap } from './map.js';
+import { renderMap, zoomMapBy, fitMap, relayoutMap, unlockAllNodes } from './map.js';
 
 // ───────────────────────────────────────────────
 // Action handlers — one entry per data-action value
@@ -105,6 +105,10 @@ const actions = {
   'map-zoom-out': () => zoomMapBy(1.18),
   'map-fit': () => fitMap(),
   'map-relayout': () => relayoutMap(),
+  'map-unlock-all': () => {
+    unlockAllNodes();
+    toast('Toutes les positions libérées', 'info', 1500);
+  },
   'jump-to-paragraph': (target) => {
     if (!state.game) return;
     const num = parseInt(target.dataset.num);
@@ -127,7 +131,14 @@ const actions = {
   // Menu actions
   'menu-close': () => render.closeGameMenu(),
   'menu-save': () => { doSave(); render.closeGameMenu(); },
-  'menu-dice': () => { render.closeGameMenu(); render.showDiceRoll(rollDice(2), 'Lancer libre : 2D6'); },
+  'menu-dice': () => {
+    render.closeGameMenu();
+    const rolls = rollDice(2);
+    const total = rolls.reduce((s, v) => s + v, 0);
+    logDice({ rolls, modifier: 0, modifierLabel: '', total, label: 'Lancer libre' });
+    render.showDiceRoll(rolls, 'Lancer libre : 2D6');
+    render.renderDiceLog();
+  },
   'menu-test-luck': () => { render.closeGameMenu(); doTestLuck(); },
   'menu-quit': () => quitAdventure(),
   'new-run': () => doNewRunFromActiveGame(),
@@ -137,6 +148,26 @@ const actions = {
     const wasDeath = adjustStat(target.dataset.key, parseInt(target.dataset.delta));
     render.renderStats();
     if (wasDeath) modal.alert("Votre héros est mort ! Son endurance est tombée à 0.", 'Mort');
+  },
+  'stat-delta-apply': (target) => {
+    const key = target.dataset.key;
+    const input = document.querySelector(`.stat-delta-input[data-stat-key="${key}"]`);
+    if (!input) return;
+    const delta = parseInt(input.value);
+    if (!Number.isFinite(delta) || delta === 0) {
+      input.focus();
+      return;
+    }
+    const wasDeath = adjustStat(key, delta);
+    input.value = '';
+    render.renderStats();
+    if (wasDeath) {
+      modal.alert("Votre héros est mort ! Son endurance est tombée à 0.", 'Mort');
+    } else {
+      const config = resolveConfig(state.game);
+      const statName = config.stats.find(s => s.key === key)?.name || key;
+      toast(`${statName} : ${delta > 0 ? '+' : ''}${delta}`, delta < 0 ? 'warn' : 'success', 1500);
+    }
   },
 
   // Special section
@@ -259,6 +290,58 @@ const actions = {
     });
     el('new-para-num').focus();
   },
+  'see-only-paragraph': () => {
+    if (!state.game) return;
+    const numInp = el('new-para-num');
+    const noteInp = el('new-para-note');
+    const num = parseInt(numInp.value);
+    if (!Number.isFinite(num) || num <= 0) {
+      numInp.focus();
+      return;
+    }
+    const sentiment = state.pendingSentiment;
+    const note = noteInp.value.trim();
+    if (!state.game.paragraphs) state.game.paragraphs = {};
+    const isNew = !state.game.paragraphs[num];
+    if (isNew) state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+    if (sentiment && sentiment !== 'neutral') state.game.paragraphs[num].sentiment = sentiment;
+    if (note) state.game.paragraphs[num].note = note;
+    // No paragraphHistory.push → pas de visite, pas d'arête sur la carte
+    // Reset form
+    numInp.value = '';
+    noteInp.value = '';
+    state.pendingSentiment = 'neutral';
+    document.querySelectorAll('.sentiment-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.value === 'neutral');
+    });
+    render.renderParagraphs();
+    renderMap();
+    numInp.focus();
+    toast(`§${num} ajouté à la carte (sans visite)`, 'info', 1800);
+  },
+  'undo-paragraph': () => {
+    if (!state.game || !Array.isArray(state.game.paragraphHistory)) return;
+    const history = state.game.paragraphHistory;
+    if (history.length <= 1) {
+      toast("Rien à annuler", 'warn', 1500);
+      return;
+    }
+    const removed = history.pop();
+    // Skip null markers (run boundaries) — they shouldn't be removable
+    if (removed === null) {
+      history.push(null); // put it back
+      toast("Pas de visite à annuler dans cette run", 'warn', 1500);
+      return;
+    }
+    // Update currentParagraph to previous non-null entry
+    let i = history.length - 1;
+    while (i >= 0 && history[i] === null) i--;
+    state.game.currentParagraph = i >= 0 ? history[i] : 1;
+    el('current-para').value = state.game.currentParagraph;
+    render.renderParagraphs();
+    renderMap();
+    toast(`§${removed} retiré de l'historique`, 'info', 1800);
+  },
   'cycle-sentiment': (target) => {
     const num = parseInt(target.dataset.num);
     if (!state.game.paragraphs) state.game.paragraphs = {};
@@ -268,6 +351,10 @@ const actions = {
     const order = ['neutral', 'positive', 'negative'];
     const cur = state.game.paragraphs[num].sentiment || 'neutral';
     state.game.paragraphs[num].sentiment = order[(order.indexOf(cur) + 1) % order.length];
+    render.renderParagraphs();
+  },
+  'filter-paragraphs': (target) => {
+    state.paragraphFilter = target.value || '';
     render.renderParagraphs();
   },
   'set-para-note': (target) => {
@@ -293,6 +380,7 @@ const actions = {
     render.renderStats();
     render.renderAdversaries();
     render.updateCombatButtons();
+    render.renderDiceLog();
   },
   'test-luck-combat': () => {
     const logs = combat.testLuckCombat();
@@ -300,6 +388,7 @@ const actions = {
     render.renderStats();
     render.renderAdversaries();
     render.updateCombatButtons();
+    render.renderDiceLog();
   },
   'flee': () => {
     const logs = combat.fleeCombat();
@@ -309,6 +398,23 @@ const actions = {
     render.updateCombatButtons();
   },
   'clear-combat-log': () => render.clearCombatLog(),
+  'clear-dice-log': () => {
+    if (state.game) state.game.diceLog = [];
+    render.renderDiceLog();
+  },
+  'toggle-combat-mode': (target) => {
+    if (!state.game) return;
+    state.game.combatMode = target.checked ? 'sequential' : 'simultaneous';
+    if (state.game.combatMode === 'simultaneous') state.game.targetedAdversaryIdx = null;
+    render.renderAdversaries();
+    render.updateCombatButtons();
+  },
+  'target-adversary': (target) => {
+    if (!state.game) return;
+    const idx = parseInt(target.dataset.idx);
+    state.game.targetedAdversaryIdx = idx;
+    render.renderAdversaries();
+  },
   'adv-stamina': (target) => {
     const idx = parseInt(target.dataset.idx);
     const delta = parseInt(target.dataset.delta);
@@ -474,7 +580,10 @@ async function doSave() {
   state.game.gold = parseInt(el('gold-amount').value) || 0;
   state.game.provisions = parseInt(el('provisions-amount').value) || 0;
   const result = await persistGame(state.game);
-  if (result.ok) render.showSaveConfirmation();
+  if (result.ok) {
+    render.showSaveConfirmation();
+    toast('Sauvegardé', 'success', 1800);
+  }
 }
 
 async function quitAdventure() {
@@ -520,6 +629,7 @@ function doTestLuck() {
     : `MALCHANCEUX ! (${result.total} > ${result.currentLuck})`;
   render.showDiceRoll(result.rolls, txt);
   render.renderStats();
+  render.renderDiceLog();
 }
 
 function addAlertFromInput() {
@@ -582,7 +692,7 @@ async function eatMeal() {
   );
   el('provisions-amount').value = state.game.provisions;
   render.renderStats();
-  await modal.alert(`Repas pris ! +${restore} Endurance`);
+  toast(`Repas pris : +${restore} Endurance`, 'success');
 }
 
 async function usePotion(idx) {
@@ -599,7 +709,7 @@ async function usePotion(idx) {
   }
   render.renderStats();
   render.renderPotions();
-  await modal.alert(`${potion.name} bue ! ${potion.effect}`);
+  toast(`${potion.name} bue${potion.effect ? ' — ' + potion.effect : ''}`, 'success');
 }
 
 function loadGame(idx) {

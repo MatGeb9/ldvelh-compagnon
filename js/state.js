@@ -13,6 +13,7 @@ export const state = {
     objects: [],
   },
   pendingSentiment: 'neutral', // for the in-game "Ajouter un paragraphe" form
+  paragraphFilter: '',         // live search filter on the Notes tab
   lastCombatResult: null,      // combat → luck check chaining
 };
 
@@ -68,6 +69,10 @@ export function createGameState({ adventure, heroName, bookTitle, rolledStats, s
     currentParagraph: 1,
     paragraphHistory: [1],
     paragraphs: { 1: { sentiment: 'neutral', note: '' } },
+    diceLog: [],                  // [{ rolls, modifier, modifierLabel, total, label, ts }] — bounded to 10
+    mapLockedPositions: {},       // { num: { x, y } } — manual node placements on the map
+    combatMode: 'simultaneous',   // 'simultaneous' (default, attacks all adversaries) | 'sequential' (one at a time, by target)
+    targetedAdversaryIdx: null,   // index in adversaries[] for sequential mode
     adversaries: [],
     combatLog: [],
     special: {},
@@ -177,6 +182,16 @@ export function startNewRun(game, { reroll = false } = {}) {
   // Run counter for UX
   game.runCount = (game.runCount || 1) + 1;
   game.timestamp = Date.now();
+}
+
+// Append a dice roll entry to the game's diceLog (capped at 10 most recent).
+export function logDice({ rolls, modifier = 0, modifierLabel = '', total, label }) {
+  if (!state.game) return;
+  if (!Array.isArray(state.game.diceLog)) state.game.diceLog = [];
+  state.game.diceLog.push({ rolls, modifier, modifierLabel, total, label, ts: Date.now() });
+  if (state.game.diceLog.length > 10) {
+    state.game.diceLog = state.game.diceLog.slice(-10);
+  }
 }
 
 // Adjust a stat with bounds (0 .. statsMax[key]).

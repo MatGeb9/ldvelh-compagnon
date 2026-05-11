@@ -1,5 +1,5 @@
 import { rollDice } from './dice.js';
-import { state, resolveConfig } from './state.js';
+import { state, resolveConfig, logDice } from './state.js';
 
 // ──────────── Pure helpers ────────────
 
@@ -34,12 +34,23 @@ export function combatRound() {
   const config = resolveConfig(game);
   const log = [];
 
-  const liveAdversaries = game.adversaries.filter(a => !a.defeated);
-  if (liveAdversaries.length === 0) return log;
+  let targets = game.adversaries.filter(a => !a.defeated);
+  if (targets.length === 0) return log;
 
-  liveAdversaries.forEach(adv => {
+  // Sequential mode: fight only the targeted adversary (if any)
+  if (game.combatMode === 'sequential') {
+    const idx = game.targetedAdversaryIdx;
+    if (idx == null || !game.adversaries[idx] || game.adversaries[idx].defeated) {
+      return [{ text: "Mode séquentiel : sélectionnez d'abord une cible avec « Cible ».", type: 'info' }];
+    }
+    targets = [game.adversaries[idx]];
+  }
+
+  targets.forEach(adv => {
     const hero = combatAttackRoll(game.stats[config.combatSkill]);
     const enemy = combatAttackRoll(adv.skill);
+    logDice({ rolls: hero.rolls, modifier: game.stats[config.combatSkill], modifierLabel: 'HAB', total: hero.total, label: 'Vous' });
+    logDice({ rolls: enemy.rolls, modifier: adv.skill, modifierLabel: 'HAB', total: enemy.total, label: adv.name });
 
     log.push({ text: `--- Tour contre ${adv.name} ---`, type: 'info' });
     log.push({
@@ -106,6 +117,7 @@ export function testLuckCombat() {
   const log = [];
   const result = rollLuck(game.stats[luckKey]);
   const currentLuck = game.stats[luckKey];
+  logDice({ rolls: result.rolls, modifier: 0, modifierLabel: '', total: result.total, label: `Chance combat (≤${currentLuck})` });
   game.stats[luckKey] = Math.max(0, game.stats[luckKey] - 1);
 
   const last = state.lastCombatResult;
@@ -164,6 +176,7 @@ export function testLuck() {
 
   const currentLuck = game.stats[luckKey];
   const result = rollLuck(currentLuck);
+  logDice({ rolls: result.rolls, modifier: 0, modifierLabel: '', total: result.total, label: `Chance (≤${currentLuck})` });
   game.stats[luckKey] = Math.max(0, currentLuck - 1);
   return { ...result, currentLuck };
 }

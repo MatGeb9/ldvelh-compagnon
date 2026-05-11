@@ -482,14 +482,31 @@ input:focus, select:focus, textarea:focus {
 .stat-card .stat-controls {
     display: flex;
     justify-content: center;
-    gap: 0.3rem;
+    align-items: center;
+    gap: 0.25rem;
     margin-top: 0.4rem;
+    flex-wrap: wrap;
 }
 
 .stat-card .stat-controls .btn {
     padding: 0.15rem 0.5rem;
     font-size: 1rem;
     min-width: 30px;
+}
+
+.stat-card .stat-delta-input {
+    width: 56px;
+    font-size: 0.95rem;
+    padding: 0.2rem 0.3rem;
+    text-align: center;
+    background: var(--parchment-light);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-left: 0.3rem;
+}
+
+.stat-card .stat-delta-input:focus {
+    outline: 2px solid var(--gold);
 }
 
 .stat-card.stat-danger .stat-current {
@@ -677,10 +694,37 @@ input:focus, select:focus, textarea:focus {
 .alert-add select { width: auto; min-width: 100px; }
 
 /* ---- Combat ---- */
+.combat-zone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.combat-zone-header h3 {
+    margin: 0;
+    text-align: left;
+}
+
+.combat-mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.92rem;
+    cursor: pointer;
+    background: var(--parchment-light);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.25rem 0.6rem;
+}
+
+.combat-mode-toggle input { cursor: pointer; }
+
 .combat-zone h3 {
     font-family: var(--font-title);
     color: var(--red);
-    margin-bottom: 1rem;
     font-size: 1.4rem;
     text-align: center;
 }
@@ -705,6 +749,10 @@ input:focus, select:focus, textarea:focus {
 .adversary-card.defeated {
     opacity: 0.5;
     text-decoration: line-through;
+}
+.adversary-card.targeted {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.4);
 }
 
 .adversary-card .adv-name {
@@ -850,6 +898,34 @@ textarea {
     color: var(--ink);
     resize: vertical;
     margin-bottom: 1rem;
+}
+
+.para-history-header {
+    display: flex;
+    gap: 0.8rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.para-history-header h3 {
+    margin: 0;
+}
+
+.para-filter-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--parchment-light);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+}
+
+.para-filter-input:focus {
+    outline: 2px solid var(--gold);
+    background: var(--parchment);
 }
 
 .para-history {
@@ -1433,6 +1509,102 @@ textarea {
     text-align: center;
     padding: 1.5rem;
 }
+
+/* ---- Derniers lancers de dés ---- */
+.dice-log-section {
+    margin-top: 1rem;
+    background: var(--parchment-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+}
+
+.dice-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+}
+
+.dice-log-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.dice-log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.88rem;
+}
+
+.dice-log-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.6rem;
+    padding: 0.25rem 0.4rem;
+    background: var(--parchment-dark);
+    border-radius: 4px;
+}
+
+.dice-log-label {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.dice-log-formula {
+    color: var(--ink-light);
+    font-family: var(--font-body);
+}
+
+.dice-log-total {
+    font-family: var(--font-title);
+    color: var(--red);
+    min-width: 30px;
+    text-align: right;
+    font-weight: bold;
+}
+
+/* ---- Toast (transient feedback) ---- */
+#toast-root {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 0.4rem;
+    pointer-events: none;
+    max-width: 90vw;
+}
+
+.toast {
+    background: rgba(44, 24, 16, 0.95);
+    color: var(--parchment-light);
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--gold-dark);
+    font-size: 0.95rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.22s ease-out, transform 0.22s ease-out;
+    pointer-events: auto;
+    white-space: pre-wrap;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-success { border-color: var(--success); }
+.toast-warn    { border-color: var(--warning); }
+.toast-error   { border-color: var(--danger); }
+.toast-info    { border-color: var(--info); }
 
 /* ---- Modal custom (alert/confirm) ---- */
 .modal-overlay {

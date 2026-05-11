@@ -29,17 +29,25 @@ function buildGraph(game) {
 }
 
 // Fruchterman-Reingold (simplifié) — converge en ~250 itérations pour ~100 nœuds
-function computeLayout(nodes, edges, width, height, iterations = 250) {
+// `locked` est une map { nodeId: {x, y} } pour les positions épinglées (drag manuel utilisateur).
+function computeLayout(nodes, edges, width, height, iterations = 250, locked = {}) {
   if (nodes.length === 0) return {};
-  if (nodes.length === 1) return { [nodes[0]]: { x: width / 2, y: height / 2 } };
+  if (nodes.length === 1) {
+    const only = nodes[0];
+    return { [only]: locked[only] ? { ...locked[only] } : { x: width / 2, y: height / 2 } };
+  }
 
   const pos = {};
   const vel = {};
   const cx = width / 2, cy = height / 2;
   const initR = Math.min(width, height) / 3;
   nodes.forEach((n, i) => {
-    const angle = (i / nodes.length) * Math.PI * 2;
-    pos[n] = { x: cx + Math.cos(angle) * initR, y: cy + Math.sin(angle) * initR };
+    if (locked[n]) {
+      pos[n] = { x: locked[n].x, y: locked[n].y };
+    } else {
+      const angle = (i / nodes.length) * Math.PI * 2;
+      pos[n] = { x: cx + Math.cos(angle) * initR, y: cy + Math.sin(angle) * initR };
+    }
     vel[n] = { x: 0, y: 0 };
   });
 
@@ -78,9 +86,14 @@ function computeLayout(nodes, edges, width, height, iterations = 250) {
       vel[b].y += (dy / dist) * force;
     });
 
-    // Apply velocities with cooling + damping
+    // Apply velocities with cooling + damping (skip locked nodes — they stay pinned)
     const maxV = 30 * cooling;
     nodes.forEach(n => {
+      if (locked[n]) {
+        pos[n].x = locked[n].x;
+        pos[n].y = locked[n].y;
+        return;
+      }
       let vx = vel[n].x * 0.04;
       let vy = vel[n].y * 0.04;
       vx = Math.max(-maxV, Math.min(maxV, vx));
@@ -100,15 +113,28 @@ function computeLayout(nodes, edges, width, height, iterations = 250) {
 // Cache positions to avoid re-shuffling on every render
 let layoutCache = { key: '', positions: {} };
 
+function getLocked() {
+  return state.game?.mapLockedPositions || {};
+}
+
 function getOrComputeLayout(nodes, edges) {
-  const key = nodes.slice().sort((a, b) => a - b).join(',') + '|' + edges.length;
+  const locked = getLocked();
+  const lockedKey = Object.keys(locked).sort().map(k => `${k}:${Math.round(locked[k].x)},${Math.round(locked[k].y)}`).join(';');
+  const key = nodes.slice().sort((a, b) => a - b).join(',') + '|' + edges.length + '|' + lockedKey;
   if (layoutCache.key === key) return layoutCache.positions;
-  layoutCache = { key, positions: computeLayout(nodes, edges, VIEW_W, VIEW_H) };
+  layoutCache = { key, positions: computeLayout(nodes, edges, VIEW_W, VIEW_H, 250, locked) };
   return layoutCache.positions;
 }
 
 export function invalidateMapLayout() {
   layoutCache = { key: '', positions: {} };
+}
+
+export function unlockAllNodes() {
+  if (!state.game) return;
+  state.game.mapLockedPositions = {};
+  invalidateMapLayout();
+  renderMap();
 }
 
 export function renderMap() {
@@ -131,6 +157,7 @@ export function renderMap() {
     return `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" stroke="#5a3a28" stroke-width="1.6" marker-end="url(#arrow)" opacity="0.55"/>`;
   }).join('');
 
+  const locked = getLocked();
   const nodesSvg = nodes.map(num => {
     const p = positions[num];
     if (!p) return '';
@@ -138,14 +165,21 @@ export function renderMap() {
     const sentiment = meta.sentiment || 'neutral';
     const fill = sentiment === 'positive' ? '#27ae60' : sentiment === 'negative' ? '#c0392b' : '#b0a78f';
     const isCurrent = num === game.currentParagraph;
+    const isLocked = locked[num] != null;
     const r = isCurrent ? 22 : 18;
     const stroke = isCurrent ? '#d4a017' : '#2c1810';
     const strokeW = isCurrent ? 3 : 2;
-    const titleAttr = `§${num}${meta.note ? ' — ' + escapeHtml(meta.note) : ''}`;
-    return `<g class="map-node" data-action="jump-to-paragraph" data-num="${num}" transform="translate(${p.x},${p.y})">
+    const lockedClass = isLocked ? ' locked' : '';
+    const titleAttr = `§${num}${meta.note ? ' — ' + escapeHtml(meta.note) : ''}${isLocked ? ' [position épinglée]' : ''}`;
+    // Tiny pin marker for locked nodes
+    const pinMarker = isLocked
+      ? `<circle r="4" cx="${r - 3}" cy="${-r + 3}" fill="#d4a017" stroke="#2c1810" stroke-width="1"/>`
+      : '';
+    return `<g class="map-node${lockedClass}" data-action="jump-to-paragraph" data-num="${num}" transform="translate(${p.x},${p.y})">
       <title>${titleAttr}</title>
       <circle r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}"/>
       <text text-anchor="middle" dominant-baseline="central" font-size="14" fill="white" style="pointer-events:none;user-select:none;font-weight:bold;">${num}</text>
+      ${pinMarker}
     </g>`;
   }).join('');
 
@@ -195,8 +229,30 @@ function attachPanZoom(svg) {
     setViewBox(vb);
   };
 
+  const clientDeltaToSvg = (dx, dy) => {
+    const vb = getViewBox();
+    const rect = svg.getBoundingClientRect();
+    return { dx: dx * vb.w / rect.width, dy: dy * vb.h / rect.height };
+  };
+
   svg.addEventListener('pointerdown', (e) => {
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const nodeEl = e.target.closest('.map-node');
+    let nodeStart = null;
+    if (nodeEl) {
+      const match = nodeEl.getAttribute('transform')?.match(/translate\(([\d.-]+),\s*([\d.-]+)\)/);
+      if (match) {
+        nodeStart = { x: parseFloat(match[1]), y: parseFloat(match[2]) };
+      }
+    }
+    pointers.set(e.pointerId, {
+      x: e.clientX,
+      y: e.clientY,
+      nodeEl,
+      nodeNum: nodeEl ? parseInt(nodeEl.dataset.num) : null,
+      nodeX: nodeStart?.x ?? null,
+      nodeY: nodeStart?.y ?? null,
+      moved: false,
+    });
     pinchDist = null;
     dragDistance = 0;
   });
@@ -208,10 +264,21 @@ function attachPanZoom(svg) {
     const dy = e.clientY - ptr.y;
     ptr.x = e.clientX;
     ptr.y = e.clientY;
+    const moveAmount = Math.hypot(dx, dy);
+    if (moveAmount > 2) ptr.moved = true;
 
     if (pointers.size === 1) {
-      dragDistance += Math.hypot(dx, dy);
-      panBy(dx, dy);
+      dragDistance += moveAmount;
+      if (ptr.nodeEl && ptr.nodeX != null) {
+        // Drag this node only
+        const svgDelta = clientDeltaToSvg(dx, dy);
+        ptr.nodeX += svgDelta.dx;
+        ptr.nodeY += svgDelta.dy;
+        ptr.nodeEl.setAttribute('transform', `translate(${ptr.nodeX},${ptr.nodeY})`);
+      } else {
+        // Pan the viewBox
+        panBy(dx, dy);
+      }
     } else if (pointers.size === 2) {
       const arr = [...pointers.values()];
       const dist = Math.hypot(arr[0].x - arr[1].x, arr[0].y - arr[1].y);
@@ -223,6 +290,14 @@ function attachPanZoom(svg) {
   });
 
   const release = (e) => {
+    const ptr = pointers.get(e.pointerId);
+    if (ptr && ptr.nodeEl && ptr.moved && ptr.nodeX != null && state.game) {
+      // Persist node's new position and re-render edges
+      if (!state.game.mapLockedPositions) state.game.mapLockedPositions = {};
+      state.game.mapLockedPositions[ptr.nodeNum] = { x: ptr.nodeX, y: ptr.nodeY };
+      invalidateMapLayout();
+      renderMap();
+    }
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinchDist = null;
   };
