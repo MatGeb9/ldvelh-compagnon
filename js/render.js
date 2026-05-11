@@ -158,7 +158,7 @@ export function renderGameScreen() {
   renderAlerts();
   renderAdversaries();
   renderInventory();
-  renderParagraphHistory();
+  renderParagraphs();
   el('current-para').value = game.currentParagraph;
   el('game-notes').value = game.notes || '';
   el('gold-amount').value = game.gold;
@@ -333,18 +333,40 @@ export function renderAlerts() {
   });
 }
 
-// ──────────── Paragraph history ────────────
+// ──────────── Paragraph history (rich) ────────────
 
-export function renderParagraphHistory() {
+export function renderParagraphs() {
   const container = el('para-history');
   container.innerHTML = '';
-  (state.game?.paragraphHistory || []).forEach(p => {
-    const entry = document.createElement('span');
-    entry.className = 'para-entry';
-    entry.textContent = `§${p}`;
-    container.appendChild(entry);
+  const history = state.game?.paragraphHistory || [];
+  const paragraphs = state.game?.paragraphs || {};
+
+  if (history.length === 0) {
+    container.innerHTML = '<p class="para-empty">Aucun paragraphe visité.</p>';
+    return;
+  }
+
+  history.forEach((num, i) => {
+    const meta = paragraphs[num] || { sentiment: 'neutral', note: '' };
+    const sentiment = meta.sentiment || 'neutral';
+    const row = document.createElement('div');
+    row.className = 'para-row';
+    row.dataset.num = num;
+    row.innerHTML = html`
+      <span class="para-num">§${num}</span>
+      <button class="sentiment-dot ${sentiment}" data-action="cycle-sentiment" data-num="${num}"
+              title="Sentiment (clic pour changer)" aria-label="Changer sentiment"></button>
+      <input type="text" class="para-note" data-action="set-para-note" data-num="${num}"
+             placeholder="Note rapide…" value="${meta.note || ''}">
+      <button class="para-remove" data-action="remove-para-visit" data-idx="${i}"
+              title="Retirer cette visite">${raw('&#10006;')}</button>
+    `;
+    container.appendChild(row);
   });
 }
+
+// Backwards compat alias — some old call sites might still use the old name.
+export const renderParagraphHistory = renderParagraphs;
 
 // ──────────── Adversaries ────────────
 

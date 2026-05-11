@@ -136,6 +136,31 @@ const actions = {
 
   // Paragraph history → switch to notes tab
   'para-history': () => render.switchTab('tab-notes'),
+  'cycle-sentiment': (target) => {
+    const num = parseInt(target.dataset.num);
+    if (!state.game.paragraphs) state.game.paragraphs = {};
+    if (!state.game.paragraphs[num]) {
+      state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+    }
+    const order = ['neutral', 'positive', 'negative'];
+    const cur = state.game.paragraphs[num].sentiment || 'neutral';
+    state.game.paragraphs[num].sentiment = order[(order.indexOf(cur) + 1) % order.length];
+    render.renderParagraphs();
+  },
+  'set-para-note': (target) => {
+    const num = parseInt(target.dataset.num);
+    if (!state.game.paragraphs) state.game.paragraphs = {};
+    if (!state.game.paragraphs[num]) {
+      state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+    }
+    state.game.paragraphs[num].note = target.value;
+  },
+  'remove-para-visit': (target) => {
+    const idx = parseInt(target.dataset.idx);
+    if (!state.game.paragraphHistory) return;
+    state.game.paragraphHistory.splice(idx, 1);
+    render.renderParagraphs();
+  },
 
   // Combat
   'add-adversary': () => addAdversaryFromInputs(),
@@ -408,6 +433,15 @@ function loadGame(idx) {
     || [];
   state.game.statDefs = statDefs;
   state.game.adventureConfig = advType ? { ...advType, stats: statDefs } : { stats: statDefs };
+  // Migration: old saves only had paragraphHistory (flat array). Build paragraphs map.
+  if (!state.game.paragraphs) {
+    state.game.paragraphs = {};
+    (state.game.paragraphHistory || []).forEach(num => {
+      if (!state.game.paragraphs[num]) {
+        state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+      }
+    });
+  }
   render.showScreen('screen-game');
   render.renderGameScreen();
 }
@@ -439,15 +473,28 @@ export function attachEvents() {
     }
   });
 
+  // Delegated input handler for text inputs (used for live note editing on paragraphs)
+  document.addEventListener('input', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    if (target.tagName === 'INPUT' && target.type !== 'checkbox') {
+      const handler = actions[target.dataset.action];
+      if (handler) handler(target, e);
+    }
+  });
+
   // Static input listeners
   el('current-para').addEventListener('change', () => {
     if (!state.game) return;
     const val = parseInt(el('current-para').value) || 1;
     state.game.currentParagraph = val;
-    if (!state.game.paragraphHistory.includes(val)) {
-      state.game.paragraphHistory.push(val);
+    if (!state.game.paragraphs) state.game.paragraphs = {};
+    if (!state.game.paragraphs[val]) {
+      state.game.paragraphs[val] = { sentiment: 'neutral', note: '' };
     }
-    render.renderParagraphHistory();
+    if (!state.game.paragraphHistory) state.game.paragraphHistory = [];
+    state.game.paragraphHistory.push(val); // allow duplicate visits
+    render.renderParagraphs();
   });
   el('gold-amount').addEventListener('change', () => {
     if (!state.game) return;

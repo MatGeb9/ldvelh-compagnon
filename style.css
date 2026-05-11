@@ -754,19 +754,95 @@ textarea {
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.8rem;
-    max-height: 300px;
+    max-height: 400px;
     overflow-y: auto;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
 }
 
-.para-entry {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    margin: 0.1rem;
+.para-empty {
+    font-style: italic;
+    color: var(--ink-light);
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.para-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0.6rem;
     background: var(--parchment-dark);
-    border-radius: 4px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+.para-row:hover {
+    background: var(--parchment);
+}
+
+.para-row .para-num {
     font-family: var(--font-title);
-    cursor: default;
+    font-size: 1.15rem;
+    color: var(--ink);
+    min-width: 52px;
+    text-align: left;
+}
+
+.sentiment-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--ink-light);
+    background: #999;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.sentiment-dot:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 6px var(--shadow);
+}
+
+.sentiment-dot.positive { background: var(--success); }
+.sentiment-dot.negative { background: var(--danger); }
+.sentiment-dot.neutral  { background: #b0a78f; }
+
+.para-note {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 1px dashed var(--border);
+    padding: 4px 8px;
+    font-family: var(--font-body);
+    font-size: 0.92rem;
+    color: var(--ink);
+    border-radius: 4px;
+}
+
+.para-note:focus {
+    outline: 2px solid var(--gold);
+    background: var(--parchment-light);
+    border-style: solid;
+}
+
+.para-remove {
+    background: transparent;
+    border: none;
+    color: var(--ink-light);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0 0.3rem;
+    flex-shrink: 0;
+}
+
+.para-remove:hover {
+    color: var(--danger);
 }
 
 /* ---- Special Section ---- */

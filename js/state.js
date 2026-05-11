@@ -47,6 +47,7 @@ export function createGameState({ adventure, heroName, bookTitle, rolledStats, s
     notes: '',
     currentParagraph: 1,
     paragraphHistory: [1],
+    paragraphs: { 1: { sentiment: 'neutral', note: '' } },
     adversaries: [],
     combatLog: [],
     special: {},
