@@ -1,4 +1,4 @@
-const CACHE = 'ldvelh-v5';
+const CACHE = 'ldvelh-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const ASSETS = [
   './js/combat.js',
   './js/render.js',
   './js/events.js',
+  './js/map.js',
 ];
 
 self.addEventListener('install', e => {

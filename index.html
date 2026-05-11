@@ -87,6 +87,7 @@
             <button class="tab-btn" data-action="tab" data-tab="tab-combat">Combat</button>
             <button class="tab-btn" data-action="tab" data-tab="tab-inventory">Inventaire</button>
             <button class="tab-btn" data-action="tab" data-tab="tab-notes">Notes</button>
+            <button class="tab-btn" data-action="tab" data-tab="tab-map">Carte</button>
         </nav>
 
         <!-- TAB: Personnage / Stats -->
@@ -217,6 +218,18 @@
                 <h3>&#128506; Historique des Paragraphes</h3>
                 <div id="para-history" class="para-history"></div>
             </div>
+        </div>
+
+        <!-- TAB: Carte / Mind-map -->
+        <div id="tab-map" class="tab-content">
+            <div class="map-controls">
+                <button class="btn btn-small" data-action="map-zoom-in" title="Zoom +">+</button>
+                <button class="btn btn-small" data-action="map-zoom-out" title="Zoom −">−</button>
+                <button class="btn btn-small" data-action="map-fit" title="Recadrer">&#8676;</button>
+                <button class="btn btn-small btn-primary" data-action="map-relayout" title="Recalculer le placement">&#x21BB; Re-layout</button>
+                <span class="map-hint">Glisser pour bouger · pincer/molette pour zoomer · clic = sauter au § (nouvelle visite)</span>
+            </div>
+            <div id="map-canvas" class="map-canvas"></div>
         </div>
 
         <!-- Menu contextuel -->

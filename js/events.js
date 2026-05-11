@@ -5,6 +5,7 @@ import { getSaves, persistGame, removeSave } from './save.js';
 import { getAdventureType } from './adventure-types.js';
 import * as combat from './combat.js';
 import * as render from './render.js';
+import { renderMap, zoomMapBy, fitMap, relayoutMap } from './map.js';
 
 // ───────────────────────────────────────────────
 // Action handlers — one entry per data-action value
@@ -56,7 +57,30 @@ const actions = {
   },
 
   // Tabs
-  'tab': (target) => render.switchTab(target.dataset.tab),
+  'tab': (target) => {
+    render.switchTab(target.dataset.tab);
+    if (target.dataset.tab === 'tab-map') renderMap();
+  },
+
+  // Map controls
+  'map-zoom-in': () => zoomMapBy(0.85),
+  'map-zoom-out': () => zoomMapBy(1.18),
+  'map-fit': () => fitMap(),
+  'map-relayout': () => relayoutMap(),
+  'jump-to-paragraph': (target) => {
+    if (!state.game) return;
+    const num = parseInt(target.dataset.num);
+    state.game.currentParagraph = num;
+    el('current-para').value = num;
+    if (!state.game.paragraphHistory) state.game.paragraphHistory = [];
+    state.game.paragraphHistory.push(num);
+    if (!state.game.paragraphs) state.game.paragraphs = {};
+    if (!state.game.paragraphs[num]) {
+      state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+    }
+    render.renderParagraphs();
+    renderMap();
+  },
 
   // Game header
   'save': () => doSave(),

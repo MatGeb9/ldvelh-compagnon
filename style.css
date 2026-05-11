@@ -1052,6 +1052,69 @@ textarea {
     background: var(--ink-light);
 }
 
+/* ---- Mind-map des paragraphes ---- */
+.map-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.7rem;
+}
+
+.map-hint {
+    font-size: 0.8rem;
+    color: var(--ink-light);
+    font-style: italic;
+    margin-left: auto;
+}
+
+.map-canvas {
+    width: 100%;
+    height: 65vh;
+    min-height: 380px;
+    background: var(--parchment-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.map-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+}
+
+.map-svg:active {
+    cursor: grabbing;
+}
+
+.map-node {
+    cursor: pointer;
+}
+
+.map-node circle {
+    transition: r 0.15s, stroke-width 0.15s;
+}
+
+.map-node:hover circle {
+    stroke: var(--gold);
+}
+
+.map-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-style: italic;
+    color: var(--ink-light);
+    text-align: center;
+    padding: 1.5rem;
+}
+
 /* ---- Modal custom (alert/confirm) ---- */
 .modal-overlay {
     position: fixed;
