@@ -294,7 +294,14 @@
     <!-- ÉCRAN CHARGEMENT -->
     <div id="screen-load" class="screen">
         <div class="panel">
-            <h2>Charger une Partie</h2>
+            <div class="saves-header">
+                <h2>Charger une Partie</h2>
+                <div class="saves-io">
+                    <button class="btn btn-small" data-action="export-saves" title="Télécharger toutes les saves en JSON">&#128229; Exporter</button>
+                    <button class="btn btn-small" data-action="import-saves-trigger" title="Importer un fichier de saves JSON">&#128228; Importer</button>
+                    <input type="file" id="import-file" accept=".json,application/json" hidden>
+                </div>
+            </div>
             <div id="saves-list" class="saves-list"></div>
             <p id="no-saves" class="no-saves hidden">Aucune sauvegarde trouvée.</p>
             <button class="btn btn-back" id="btn-back-home-load" data-action="back-home-load">&larr; Retour</button>

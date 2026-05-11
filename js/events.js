@@ -1,7 +1,7 @@
 import { rollDice } from './dice.js';
 import { el, modal } from './dom.js';
 import { state, resolveConfig, resetCharCreate, createGameState, adjustStat, startNewRun } from './state.js';
-import { getSaves, persistGame, removeSave } from './save.js';
+import { getSaves, persistGame, removeSave, exportSaves, importSaves } from './save.js';
 import { getAdventureType } from './adventure-types.js';
 import * as combat from './combat.js';
 import * as render from './render.js';
@@ -311,6 +311,15 @@ const actions = {
     if (!(await modal.confirm('Supprimer cette sauvegarde ?'))) return;
     await removeSave(parseInt(target.dataset.idx));
     render.renderSavesList();
+  },
+  'export-saves': async () => {
+    const count = exportSaves();
+    if (count === 0) {
+      await modal.alert("Aucune sauvegarde à exporter.");
+    }
+  },
+  'import-saves-trigger': () => {
+    el('import-file').click();
   },
   'new-run-from-save': async (target, ev) => {
     ev.stopPropagation();
@@ -624,4 +633,40 @@ export function attachEvents() {
   el('game-notes').addEventListener('input', () => {
     if (state.game) state.game.notes = el('game-notes').value;
   });
+
+  // Import file picker — handled here because it's a 'change' on a file input
+  const importInput = el('import-file');
+  if (importInput) {
+    importInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      let parsed;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch (err) {
+        await modal.alert(`Fichier JSON invalide : ${err.message}`, 'Import échoué');
+        e.target.value = '';
+        return;
+      }
+      const count = Array.isArray(parsed) ? parsed.length : parsed?.saves?.length ?? 0;
+      const choice = await modal.choice(
+        `${count} sauvegarde(s) trouvée(s) dans le fichier.\n\n` +
+        `Fusionner = garde les tiennes et ajoute les nouvelles (le plus récent gagne sur conflit).\n` +
+        `Remplacer = écrase toutes tes saves locales.`,
+        [
+          { label: 'Annuler', value: null, class: 'btn-back' },
+          { label: 'Remplacer tout', value: 'replace', class: 'btn-danger' },
+          { label: 'Fusionner', value: 'merge', class: 'btn-primary' },
+        ],
+        'Importer des sauvegardes'
+      );
+      if (!choice) { e.target.value = ''; return; }
+      const result = await importSaves(parsed, choice);
+      e.target.value = '';
+      if (result.ok) {
+        await modal.alert(`Import réussi : ${result.imported} importée(s), ${result.kept} sauvegardes au total.`, 'Import OK');
+        render.renderSavesList();
+      }
+    });
+  }
 }

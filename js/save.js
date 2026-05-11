@@ -48,3 +48,73 @@ export async function removeSave(idx) {
   saves.splice(idx, 1);
   return putSaves(saves);
 }
+
+// ──────────── Export / Import ────────────
+
+// Triggers a JSON download of all saves. Returns the number of saves exported.
+export function exportSaves() {
+  const saves = getSaves();
+  const payload = {
+    app: 'ldvelh-compagnon',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    saves,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `ldvelh-saves-${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+  return saves.length;
+}
+
+// Validates that an imported entry has the minimum shape of a save.
+function isValidSave(s) {
+  return s
+    && typeof s === 'object'
+    && typeof s.heroName === 'string'
+    && typeof s.adventureType === 'string';
+}
+
+// Imports parsed JSON. mode: 'replace' wipes existing | 'merge' dedupes by (hero, adventure) keeping newer timestamp.
+// Returns { ok, imported, kept } counts (or { ok:false, error }).
+export async function importSaves(parsedJson, mode = 'merge') {
+  // Accept both raw arrays and {saves: [...]} wrapper formats
+  const incoming = Array.isArray(parsedJson) ? parsedJson : parsedJson?.saves;
+  if (!Array.isArray(incoming)) {
+    await modal.alert("Format invalide : pas de tableau 'saves' trouvé.", 'Import échoué');
+    return { ok: false };
+  }
+  const valid = incoming.filter(isValidSave);
+  if (valid.length === 0) {
+    await modal.alert("Aucune sauvegarde valide dans le fichier.", 'Import vide');
+    return { ok: false };
+  }
+
+  let next;
+  if (mode === 'replace') {
+    next = valid;
+  } else {
+    const current = getSaves();
+    const map = new Map();
+    [...current, ...valid].forEach(s => {
+      const key = `${s.heroName}|${s.adventureType}`;
+      const prev = map.get(key);
+      if (!prev || (s.timestamp || 0) > (prev.timestamp || 0)) {
+        map.set(key, s);
+      }
+    });
+    next = [...map.values()];
+  }
+
+  const result = await putSaves(next);
+  if (!result.ok) return result;
+  return { ok: true, imported: valid.length, kept: next.length };
+}

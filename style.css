@@ -1042,6 +1042,25 @@ textarea {
     letter-spacing: 0.05em;
 }
 
+.saves-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.saves-header h2 {
+    margin: 0;
+}
+
+.saves-io {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
 .no-saves {
     text-align: center;
     color: var(--ink-light);
