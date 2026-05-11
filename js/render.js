@@ -1,7 +1,7 @@
 import { ADVENTURE_TYPES, getAdventureType } from './adventure-types.js';
 import { el, escapeHtml, html, raw } from './dom.js';
 import { state, resolveConfig } from './state.js';
-import { getSaves } from './save.js';
+import { getSaves, getLastExportInfo } from './save.js';
 
 // ──────────── Navigation ────────────
 
@@ -625,11 +625,38 @@ export function showSaveConfirmation() {
 
 // ──────────── Saves list ────────────
 
+function renderExportBanner(savesCount) {
+  const banner = el('export-banner');
+  if (!banner) return;
+  if (savesCount === 0) {
+    banner.className = 'export-banner hidden';
+    banner.innerHTML = '';
+    return;
+  }
+  const info = getLastExportInfo();
+  if (!info.everExported) {
+    banner.className = 'export-banner warn';
+    banner.innerHTML = `<span>${'⚠️'} Jamais exporté — fais un backup pour ne pas tout perdre.</span>`;
+    return;
+  }
+  const d = info.daysAgo;
+  const text = d === 0 ? "aujourd'hui" : d === 1 ? 'hier' : `il y a ${d} jours`;
+  if (d > 7) {
+    banner.className = 'export-banner warn';
+    banner.innerHTML = `<span>${'⚠️'} Dernier export ${text} — pense à backuper.</span>`;
+  } else {
+    banner.className = 'export-banner ok';
+    banner.innerHTML = `<span>${'\u{1F4E5}'} Dernier export : ${text}.</span>`;
+  }
+}
+
 export function renderSavesList() {
   const saves = getSaves();
   const list = el('saves-list');
   const noSaves = el('no-saves');
   list.innerHTML = '';
+
+  renderExportBanner(saves.length);
 
   if (saves.length === 0) {
     noSaves.classList.remove('hidden');

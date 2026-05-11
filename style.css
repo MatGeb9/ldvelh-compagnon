@@ -1051,6 +1051,25 @@ textarea {
     flex-wrap: wrap;
 }
 
+.export-banner {
+    padding: 0.5rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    margin-bottom: 0.8rem;
+    border: 1px solid transparent;
+}
+.export-banner.warn {
+    background: #fff5d8;
+    color: #6b4f00;
+    border-color: var(--gold-dark);
+}
+.export-banner.ok {
+    background: var(--parchment-light);
+    color: var(--ink-light);
+    border-color: var(--border);
+}
+.export-banner.hidden { display: none; }
+
 .saves-header h2 {
     margin: 0;
 }

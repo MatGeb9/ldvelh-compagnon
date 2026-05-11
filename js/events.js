@@ -316,6 +316,8 @@ const actions = {
     const count = exportSaves();
     if (count === 0) {
       await modal.alert("Aucune sauvegarde à exporter.");
+    } else {
+      render.renderSavesList(); // refresh banner to "aujourd'hui"
     }
   },
   'import-saves-trigger': () => {

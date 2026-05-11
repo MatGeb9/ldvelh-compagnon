@@ -1,6 +1,22 @@
 import { modal } from './dom.js';
 
 const KEY = 'ldvelh_saves';
+const LAST_EXPORT_KEY = 'ldvelh_last_export';
+
+export function getLastExportInfo() {
+  const ts = parseInt(localStorage.getItem(LAST_EXPORT_KEY) || '0');
+  if (!ts || isNaN(ts)) return { everExported: false, daysAgo: null, timestamp: null };
+  const daysAgo = Math.floor((Date.now() - ts) / (24 * 60 * 60 * 1000));
+  return { everExported: true, daysAgo, timestamp: ts };
+}
+
+function markExported() {
+  try {
+    localStorage.setItem(LAST_EXPORT_KEY, String(Date.now()));
+  } catch {
+    /* ignore — banner just stays as-is */
+  }
+}
 
 export function getSaves() {
   try {
@@ -72,6 +88,7 @@ export function exportSaves() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, 100);
+  if (saves.length > 0) markExported();
   return saves.length;
 }
 
