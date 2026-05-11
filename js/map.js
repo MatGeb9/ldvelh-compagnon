@@ -15,12 +15,15 @@ function buildGraph(game) {
   for (let i = 1; i < history.length; i++) {
     const a = history[i - 1];
     const b = history[i];
+    if (a === null || b === null) continue; // run boundary — no edge across runs
     if (a === b) continue;
     nodeSet.add(a);
     nodeSet.add(b);
     const key = `${a}->${b}`;
     if (!edgeMap.has(key)) edgeMap.set(key, { a, b });
   }
+  // Add any standalone nodes from non-null entries (in case some appear only at the start of a run)
+  history.forEach(n => { if (n !== null) nodeSet.add(n); });
 
   return { nodes: [...nodeSet], edges: [...edgeMap.values()] };
 }

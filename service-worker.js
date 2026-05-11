@@ -1,4 +1,4 @@
-const CACHE = 'ldvelh-v6';
+const CACHE = 'ldvelh-v7';
 const ASSETS = [
   './',
   './index.html',

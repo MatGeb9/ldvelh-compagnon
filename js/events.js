@@ -1,6 +1,6 @@
 import { rollDice } from './dice.js';
 import { el, modal } from './dom.js';
-import { state, resolveConfig, resetCharCreate, createGameState, adjustStat } from './state.js';
+import { state, resolveConfig, resetCharCreate, createGameState, adjustStat, startNewRun } from './state.js';
 import { getSaves, persistGame, removeSave } from './save.js';
 import { getAdventureType } from './adventure-types.js';
 import * as combat from './combat.js';
@@ -92,6 +92,7 @@ const actions = {
   'menu-dice': () => { render.closeGameMenu(); render.showDiceRoll(rollDice(2), 'Lancer libre : 2D6'); },
   'menu-test-luck': () => { render.closeGameMenu(); doTestLuck(); },
   'menu-quit': () => quitAdventure(),
+  'new-run': () => doNewRunFromActiveGame(),
 
   // Stats
   'stat-adjust': (target) => {
@@ -273,6 +274,19 @@ const actions = {
     await removeSave(parseInt(target.dataset.idx));
     render.renderSavesList();
   },
+  'new-run-from-save': async (target, ev) => {
+    ev.stopPropagation();
+    const idx = parseInt(target.dataset.idx);
+    const saves = getSaves();
+    if (idx < 0 || idx >= saves.length) return;
+    // Load first (so we know heroName + can resolve config), then prompt
+    loadGame(idx);
+    if (!state.game) return;
+    const reroll = await promptNewRunChoice(state.game.heroName);
+    if (reroll === null) return; // cancelled
+    startNewRun(state.game, { reroll });
+    render.renderGameScreen();
+  },
 };
 
 // ───────────────────────────────────────────────
@@ -349,6 +363,31 @@ async function quitAdventure() {
   state.game = null;
   render.showScreen('screen-home');
   render.closeGameMenu();
+}
+
+// Returns true (reroll), false (keep stats), or null (cancelled)
+function promptNewRunChoice(heroName) {
+  return modal.choice(
+    `Nouvelle run pour ${heroName}.\n\n` +
+    `Reset : stats à fond, équipement de départ, paragraphe §1, combat vide.\n` +
+    `Gardés : notes, sentiments des paragraphes, carte explorée.`,
+    [
+      { label: 'Annuler', value: null, class: 'btn-back' },
+      { label: 'Re-roll des dés', value: true, class: 'btn-secondary' },
+      { label: 'Garder mes stats', value: false, class: 'btn-primary' },
+    ],
+    'Nouvelle run'
+  );
+}
+
+async function doNewRunFromActiveGame() {
+  if (!state.game) return;
+  render.closeGameMenu();
+  const reroll = await promptNewRunChoice(state.game.heroName);
+  if (reroll === null) return;
+  startNewRun(state.game, { reroll });
+  render.renderGameScreen();
+  renderMap(); // refresh map to show the run boundary marker
 }
 
 function doTestLuck() {

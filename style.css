@@ -983,6 +983,39 @@ textarea {
     color: var(--ink-light);
 }
 
+.save-card .save-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.save-card .save-new-run {
+    font-size: 0.78rem;
+    padding: 0.3rem 0.55rem;
+    background: var(--gold-dark);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.save-card .save-new-run:hover {
+    background: var(--gold);
+}
+
+.save-card .save-run-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    padding: 1px 6px;
+    background: var(--gold);
+    color: var(--ink);
+    border-radius: 8px;
+    vertical-align: middle;
+    font-weight: 600;
+}
+
 .save-card .save-delete {
     background: none;
     border: none;
@@ -992,6 +1025,22 @@ textarea {
     color: var(--danger);
 }
 .save-card .save-delete:hover { opacity: 1; }
+
+.para-run-separator {
+    display: flex;
+    justify-content: center;
+    margin: 0.6rem 0 0.2rem;
+}
+.para-run-separator span {
+    font-family: var(--font-title);
+    font-size: 0.85rem;
+    color: var(--gold-dark);
+    padding: 0.15rem 0.8rem;
+    background: var(--parchment);
+    border: 1px dashed var(--gold-dark);
+    border-radius: 12px;
+    letter-spacing: 0.05em;
+}
 
 .no-saves {
     text-align: center;

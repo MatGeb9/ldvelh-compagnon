@@ -90,4 +90,8 @@ export const modal = {
       ],
     });
   },
+  // Generic multi-choice modal — returns the chosen button's value (or first option's value if backdrop clicked)
+  choice(message, buttons, title = '') {
+    return showModal({ title, message, buttons });
+  },
 };

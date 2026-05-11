@@ -346,7 +346,17 @@ export function renderParagraphs() {
     return;
   }
 
+  // Count run boundaries to label them
+  let runNumber = 1;
   history.forEach((num, i) => {
+    if (num === null) {
+      runNumber++;
+      const sep = document.createElement('div');
+      sep.className = 'para-run-separator';
+      sep.innerHTML = html`<span>── Run ${runNumber} ──</span>`;
+      container.appendChild(sep);
+      return;
+    }
     const meta = paragraphs[num] || { sentiment: 'neutral', note: '' };
     const sentiment = meta.sentiment || 'neutral';
     const row = document.createElement('div');
@@ -562,17 +572,24 @@ export function renderSavesList() {
     const advType = getAdventureType(save.adventureType);
     const advName = advType ? advType.name : save.adventureType;
 
+    const runBadge = save.runCount && save.runCount > 1
+      ? raw(` <span class="save-run-badge" title="Numéro de run">Run ${save.runCount}</span>`)
+      : '';
+
     const card = document.createElement('div');
     card.className = 'save-card';
     card.dataset.action = 'load-save';
     card.dataset.idx = originalIdx;
     card.innerHTML = html`
       <div class="save-info">
-        <div class="save-hero">${save.heroName}</div>
+        <div class="save-hero">${save.heroName}${runBadge}</div>
         <div class="save-detail">${advName}${raw(save.bookTitle ? ' - ' + escapeHtml(save.bookTitle) : '')}</div>
         <div class="save-detail">§${save.currentParagraph} · ${date}</div>
       </div>
-      <button class="save-delete" data-action="delete-save" data-idx="${originalIdx}" title="Supprimer">${raw('&#128465;')}</button>
+      <div class="save-actions">
+        <button class="btn btn-small save-new-run" data-action="new-run-from-save" data-idx="${originalIdx}" title="Nouvelle run (reset perso, garde la carte)">${raw('&#x21BB;')} New run</button>
+        <button class="save-delete" data-action="delete-save" data-idx="${originalIdx}" title="Supprimer">${raw('&#128465;')}</button>
+      </div>
     `;
     list.appendChild(card);
   });
