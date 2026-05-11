@@ -61,6 +61,42 @@
 
             <div id="stats-creation" class="stats-creation"></div>
 
+            <details class="equipment-section">
+                <summary>&#127890; Équipement de départ <span class="hint">(optionnel — ajustez selon le livre)</span></summary>
+                <div class="equipment-grid">
+                    <div class="form-group">
+                        <label for="starting-gold">&#129689; Or</label>
+                        <input type="number" id="starting-gold" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="starting-provisions">&#127838; Provisions</label>
+                        <input type="number" id="starting-provisions" min="0" value="0">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>&#129514; Potions</label>
+                        <div id="starting-potions-list" class="eq-list"></div>
+                        <div class="add-row">
+                            <input type="text" id="new-potion-name" placeholder="Nom" class="input-md">
+                            <input type="text" id="new-potion-effect" placeholder="Effet" class="input-md">
+                            <input type="number" id="new-potion-doses" placeholder="Doses" class="input-xs" min="1" value="1" title="Nombre de doses">
+                            <select id="new-potion-stat" class="input-sm" title="Caractéristique restaurée quand bue"></select>
+                            <button class="btn btn-small btn-primary" data-action="add-starting-potion">+ Potion</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>&#127890; Objets</label>
+                        <div id="starting-objects-list" class="eq-list"></div>
+                        <div class="add-row">
+                            <input type="text" id="new-startobj-name" placeholder="Nom de l'objet" class="input-md">
+                            <input type="text" id="new-startobj-desc" placeholder="Description (optionnel)" class="input-md">
+                            <button class="btn btn-small btn-primary" data-action="add-starting-object">+ Objet</button>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
             <div class="form-actions">
                 <button class="btn btn-back" id="btn-back-adventure" data-action="back-adventure">&larr; Retour</button>
                 <button class="btn btn-primary" id="btn-start-adventure" data-action="start-adventure">Commencer l'Aventure &#9876;</button>

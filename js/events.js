@@ -33,6 +33,13 @@ const actions = {
     // Deep-clone stats so user customisations don't pollute the shared ADVENTURE_TYPES.
     state.selectedAdventure = { ...adv, stats: adv.stats.map(s => ({ ...s })) };
     state.rolledStats = {};
+    // Initial equipment defaults: empty potions/objects (let user opt in), provisions from adventure default
+    state.startingEquipment = {
+      gold: 0,
+      provisions: adv.defaultProvisions || 0,
+      potions: [],
+      objects: [],
+    };
     render.showScreen('screen-char-create');
     render.renderCharCreate(state.selectedAdventure);
   },
@@ -54,6 +61,37 @@ const actions = {
     state.selectedAdventure.stats = state.selectedAdventure.stats.filter(s => s.key !== key);
     delete state.rolledStats[key];
     render.renderStatsCreation();
+  },
+  'add-starting-potion': () => {
+    const nameInp = el('new-potion-name');
+    const effInp = el('new-potion-effect');
+    const dosesInp = el('new-potion-doses');
+    const statSel = el('new-potion-stat');
+    const name = nameInp.value.trim();
+    if (!name) return;
+    const effect = effInp.value.trim();
+    const doses = Math.max(1, parseInt(dosesInp.value) || 1);
+    const stat = statSel.value || '';
+    state.startingEquipment.potions.push({ name, effect, doses, stat, used: 0 });
+    nameInp.value = ''; effInp.value = ''; dosesInp.value = '1'; statSel.value = '';
+    render.renderStartingEquipment();
+  },
+  'remove-starting-potion': (target) => {
+    state.startingEquipment.potions.splice(parseInt(target.dataset.idx), 1);
+    render.renderStartingEquipment();
+  },
+  'add-starting-object': () => {
+    const nameInp = el('new-startobj-name');
+    const descInp = el('new-startobj-desc');
+    const name = nameInp.value.trim();
+    if (!name) return;
+    state.startingEquipment.objects.push({ name, desc: descInp.value.trim() });
+    nameInp.value = ''; descInp.value = '';
+    render.renderStartingEquipment();
+  },
+  'remove-starting-object': (target) => {
+    state.startingEquipment.objects.splice(parseInt(target.dataset.idx), 1);
+    render.renderStartingEquipment();
   },
 
   // Tabs
@@ -335,6 +373,15 @@ async function startAdventure() {
   const heroName = el('hero-name').value.trim() || 'Héros Sans Nom';
   const bookTitle = el('book-title').value.trim();
   const statDefs = adv.stats.map(s => getEditableStatDef(s.key));
+  // Read starting gold/provisions live from inputs (rest already in state.startingEquipment)
+  const goldInp = el('starting-gold');
+  const provInp = el('starting-provisions');
+  const equipment = {
+    gold: parseInt(goldInp?.value) || 0,
+    provisions: parseInt(provInp?.value) || (adv.defaultProvisions || 0),
+    potions: state.startingEquipment.potions,
+    objects: state.startingEquipment.objects,
+  };
 
   state.game = createGameState({
     adventure: adv,
@@ -342,6 +389,7 @@ async function startAdventure() {
     bookTitle,
     rolledStats: state.rolledStats,
     statDefs,
+    equipment,
   });
   resetCharCreate();
   render.showScreen('screen-game');

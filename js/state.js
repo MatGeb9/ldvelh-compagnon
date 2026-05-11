@@ -6,12 +6,19 @@ export const state = {
   game: null,                 // active gameState
   selectedAdventure: null,    // during char-create flow
   rolledStats: {},            // during char-create flow
+  startingEquipment: {        // during char-create flow
+    gold: 0,
+    provisions: 0,
+    potions: [],
+    objects: [],
+  },
   lastCombatResult: null,     // combat → luck check chaining
 };
 
 export function resetCharCreate() {
   state.selectedAdventure = null;
   state.rolledStats = {};
+  state.startingEquipment = { gold: 0, provisions: 0, potions: [], objects: [] };
 }
 
 export function resolveConfig(game = state.game) {
@@ -20,7 +27,8 @@ export function resolveConfig(game = state.game) {
 }
 
 // Build a fresh gameState from char-create inputs.
-export function createGameState({ adventure, heroName, bookTitle, rolledStats, statDefs }) {
+// `equipment` overrides default starting gold/provisions/potions/objects when provided.
+export function createGameState({ adventure, heroName, bookTitle, rolledStats, statDefs, equipment }) {
   const stats = {};
   const statsMax = {};
   adventure.stats.forEach(s => {
@@ -29,7 +37,9 @@ export function createGameState({ adventure, heroName, bookTitle, rolledStats, s
     statsMax[s.key] = total;
   });
 
-  const potions = (adventure.potions || []).map(p => ({ ...p, used: 0 }));
+  const eq = equipment || {};
+  const potions = (eq.potions ?? []).map(p => ({ ...p, used: p.used || 0 }));
+  const objects = (eq.objects ?? []).map(o => ({ ...o }));
 
   const game = {
     adventureType: adventure.id,
@@ -39,10 +49,18 @@ export function createGameState({ adventure, heroName, bookTitle, rolledStats, s
     bookTitle,
     stats,
     statsMax,
-    gold: 0,
-    provisions: adventure.defaultProvisions,
+    gold: eq.gold ?? 0,
+    provisions: eq.provisions ?? (adventure.defaultProvisions || 0),
     potions,
-    objects: [],
+    objects,
+    // Persist the starting choices so 'Nouvelle run' can restore THIS character's
+    // initial loadout (not the adventure's defaults).
+    startingEquipment: {
+      gold: eq.gold ?? 0,
+      provisions: eq.provisions ?? (adventure.defaultProvisions || 0),
+      potions: potions.map(p => ({ ...p, used: 0 })),
+      objects: objects.map(o => ({ ...o })),
+    },
     specialItems: [],
     alerts: [],
     notes: '',
@@ -101,14 +119,18 @@ export function startNewRun(game, { reroll = false } = {}) {
     });
   }
 
-  // Equipment
-  game.gold = 0;
-  game.objects = [];
+  // Equipment — restore THIS character's starting choices (set at char-create).
+  // Fallback to adventure defaults for old saves without startingEquipment.
+  const starting = game.startingEquipment;
+  game.gold = starting?.gold ?? 0;
+  game.provisions = starting?.provisions ?? (config.defaultProvisions || 0);
+  game.objects = (starting?.objects || []).map(o => ({ ...o }));
   game.specialItems = [];
   game.alerts = [];
-  game.provisions = config.defaultProvisions || 0;
-  // Refresh all potion doses to original
-  if (Array.isArray(config.potions) && config.potions.length > 0) {
+  if (starting?.potions && Array.isArray(starting.potions)) {
+    game.potions = starting.potions.map(p => ({ ...p, used: 0 }));
+  } else if (Array.isArray(config.potions) && config.potions.length > 0) {
+    // Backward compat: old saves before startingEquipment existed
     game.potions = config.potions.map(p => ({ ...p, used: 0 }));
   } else {
     game.potions = [];

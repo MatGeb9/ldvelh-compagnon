@@ -44,6 +44,78 @@ export function renderCharCreate(adv) {
   el('hero-name').value = '';
   el('book-title').value = '';
   renderStatsCreation();
+  // Sync starting-equipment inputs to the adventure's defaults
+  const goldInp = el('starting-gold');
+  const provInp = el('starting-provisions');
+  if (goldInp) goldInp.value = state.startingEquipment.gold ?? 0;
+  if (provInp) provInp.value = state.startingEquipment.provisions ?? (adv.defaultProvisions || 0);
+  // Live-sync gold/provisions inputs back to state (so 'Nouvelle run' reset can rebuild correctly)
+  if (goldInp && !goldInp.dataset.bound) {
+    goldInp.addEventListener('input', () => {
+      state.startingEquipment.gold = parseInt(goldInp.value) || 0;
+    });
+    goldInp.dataset.bound = '1';
+  }
+  if (provInp && !provInp.dataset.bound) {
+    provInp.addEventListener('input', () => {
+      state.startingEquipment.provisions = parseInt(provInp.value) || 0;
+    });
+    provInp.dataset.bound = '1';
+  }
+  renderStartingEquipment();
+}
+
+export function renderStartingEquipment() {
+  const eq = state.startingEquipment;
+  const potionsList = el('starting-potions-list');
+  if (potionsList) {
+    potionsList.innerHTML = '';
+    if (eq.potions.length === 0) {
+      potionsList.innerHTML = '<p class="eq-empty">Aucune potion de départ.</p>';
+    } else {
+      eq.potions.forEach((p, i) => {
+        const row = document.createElement('div');
+        row.className = 'eq-row';
+        row.innerHTML = html`
+          <span class="eq-name">${p.name}</span>
+          <span class="eq-desc">${p.effect || ''}</span>
+          <span class="eq-meta">${p.doses} dose${raw(p.doses > 1 ? 's' : '')}${raw(p.stat ? ' · cible ' + escapeHtml(p.stat) : '')}</span>
+          <button class="btn btn-small btn-danger" data-action="remove-starting-potion" data-idx="${i}" title="Retirer">${raw('&#10006;')}</button>
+        `;
+        potionsList.appendChild(row);
+      });
+    }
+  }
+
+  const objectsList = el('starting-objects-list');
+  if (objectsList) {
+    objectsList.innerHTML = '';
+    if (eq.objects.length === 0) {
+      objectsList.innerHTML = '<p class="eq-empty">Aucun objet de départ.</p>';
+    } else {
+      eq.objects.forEach((o, i) => {
+        const row = document.createElement('div');
+        row.className = 'eq-row';
+        row.innerHTML = html`
+          <span class="eq-name">${o.name}</span>
+          <span class="eq-desc">${o.desc || ''}</span>
+          <button class="btn btn-small btn-danger" data-action="remove-starting-object" data-idx="${i}" title="Retirer">${raw('&#10006;')}</button>
+        `;
+        objectsList.appendChild(row);
+      });
+    }
+  }
+
+  // Populate the "stat target" select with current statDefs keys (for potion effects)
+  const statSel = el('new-potion-stat');
+  if (statSel) {
+    const adv = state.selectedAdventure;
+    const opts = ['<option value="">— aucune —</option>'];
+    (adv?.stats || []).forEach(s => {
+      opts.push(`<option value="${escapeHtml(s.key)}">${escapeHtml(s.name)} (${escapeHtml(s.key)})</option>`);
+    });
+    statSel.innerHTML = opts.join('');
+  }
 }
 
 export function renderStatsCreation() {
