@@ -959,3 +959,63 @@ textarea {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--ink-light);
 }
+
+/* ---- Modal custom (alert/confirm) ---- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+    animation: modalFadeIn 0.15s ease-out;
+}
+
+.modal-box {
+    background: var(--parchment);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 32px var(--shadow);
+    max-width: 460px;
+    width: 100%;
+    padding: 1.5rem 1.5rem 1.2rem;
+    animation: modalSlideUp 0.2s ease-out;
+}
+
+.modal-title {
+    font-family: var(--font-title);
+    font-size: 1.3rem;
+    color: var(--ink);
+    margin-bottom: 0.7rem;
+}
+
+.modal-message {
+    color: var(--ink);
+    font-size: 1.02rem;
+    line-height: 1.5;
+    margin-bottom: 1.2rem;
+    white-space: pre-wrap;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.modal-actions .btn {
+    min-width: 100px;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}

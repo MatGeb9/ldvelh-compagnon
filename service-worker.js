@@ -1,13 +1,21 @@
-const CACHE = 'ldvelh-v1';
+const CACHE = 'ldvelh-v2';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
-  './app.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',
+  './js/app.js',
+  './js/adventure-types.js',
+  './js/dice.js',
+  './js/dom.js',
+  './js/state.js',
+  './js/save.js',
+  './js/combat.js',
+  './js/render.js',
+  './js/events.js',
 ];
 
 self.addEventListener('install', e => {
