@@ -12,7 +12,8 @@ export const state = {
     potions: [],
     objects: [],
   },
-  lastCombatResult: null,     // combat → luck check chaining
+  pendingSentiment: 'neutral', // for the in-game "Ajouter un paragraphe" form
+  lastCombatResult: null,      // combat → luck check chaining
 };
 
 export function resetCharCreate() {

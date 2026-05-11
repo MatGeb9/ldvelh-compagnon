@@ -199,6 +199,66 @@ const actions = {
 
   // Paragraph history → switch to notes tab
   'para-history': () => render.switchTab('tab-notes'),
+
+  // ─── Ajout de paragraphe (formulaire en onglet Personnage) ───
+  'pick-sentiment': (target) => {
+    state.pendingSentiment = target.dataset.value;
+    document.querySelectorAll('.sentiment-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.value === state.pendingSentiment);
+    });
+  },
+  'add-paragraph': () => {
+    if (!state.game) return;
+    const numInp = el('new-para-num');
+    const noteInp = el('new-para-note');
+    const num = parseInt(numInp.value);
+    if (!Number.isFinite(num) || num <= 0) {
+      numInp.focus();
+      return;
+    }
+    const sentiment = state.pendingSentiment;
+    const note = noteInp.value.trim();
+
+    if (!state.game.paragraphs) state.game.paragraphs = {};
+    if (!state.game.paragraphs[num]) {
+      state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+    }
+    // Apply sentiment only if user explicitly picked something other than neutral
+    if (sentiment && sentiment !== 'neutral') {
+      state.game.paragraphs[num].sentiment = sentiment;
+    }
+    // Apply note only if non-empty (don't blank out existing note on revisit)
+    if (note) state.game.paragraphs[num].note = note;
+
+    state.game.currentParagraph = num;
+    if (!Array.isArray(state.game.paragraphHistory)) state.game.paragraphHistory = [];
+    state.game.paragraphHistory.push(num);
+
+    // Reset form
+    numInp.value = '';
+    noteInp.value = '';
+    state.pendingSentiment = 'neutral';
+    document.querySelectorAll('.sentiment-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.value === 'neutral');
+    });
+
+    // Update displays
+    el('current-para').value = num;
+    render.renderParagraphs();
+    renderMap(); // refresh map even if tab not visible — keeps it in sync
+
+    // Return focus to number input for fast sequential entry
+    numInp.focus();
+  },
+  'reset-para-input': () => {
+    el('new-para-num').value = '';
+    el('new-para-note').value = '';
+    state.pendingSentiment = 'neutral';
+    document.querySelectorAll('.sentiment-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.value === 'neutral');
+    });
+    el('new-para-num').focus();
+  },
   'cycle-sentiment': (target) => {
     const num = parseInt(target.dataset.num);
     if (!state.game.paragraphs) state.game.paragraphs = {};
@@ -606,17 +666,18 @@ export function attachEvents() {
   });
 
   // Static input listeners
-  el('current-para').addEventListener('change', () => {
-    if (!state.game) return;
-    const val = parseInt(el('current-para').value) || 1;
-    state.game.currentParagraph = val;
-    if (!state.game.paragraphs) state.game.paragraphs = {};
-    if (!state.game.paragraphs[val]) {
-      state.game.paragraphs[val] = { sentiment: 'neutral', note: '' };
-    }
-    if (!state.game.paragraphHistory) state.game.paragraphHistory = [];
-    state.game.paragraphHistory.push(val); // allow duplicate visits
-    render.renderParagraphs();
+  // #current-para is now a read-only display (changement de paradigme : on
+  // ajoute via le formulaire "+ Ajouter" qui contrôle sentiment + note d'un coup).
+  // Submit-on-Enter pour les inputs du formulaire d'ajout :
+  ['new-para-num', 'new-para-note'].forEach(id => {
+    const inp = el(id);
+    if (inp) inp.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const handler = actions['add-paragraph'];
+        if (handler) handler();
+      }
+    });
   });
   el('gold-amount').addEventListener('change', () => {
     if (!state.game) return;

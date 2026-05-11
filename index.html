@@ -133,12 +133,29 @@
             <!-- Section spéciale (Métamorphose, Magie, etc.) -->
             <div id="special-section" class="special-section hidden"></div>
 
-            <!-- Paragraphe actuel -->
+            <!-- Paragraphe actuel + formulaire d'ajout rapide -->
             <div class="current-paragraph">
-                <label for="current-para">Paragraphe actuel</label>
-                <div class="para-controls">
-                    <input type="number" id="current-para" min="1" value="1" placeholder="§">
-                    <button class="btn btn-small" id="btn-para-history" data-action="para-history" title="Historique">&#128337;</button>
+                <div class="current-para-header">
+                    <span class="current-para-label">Paragraphe actuel</span>
+                    <input type="number" id="current-para" min="1" value="1" placeholder="§" readonly title="Affiché ici, modifiez via le formulaire ci-dessous">
+                    <button class="btn btn-small" data-action="para-history" title="Voir l'historique dans Notes">&#128337;</button>
+                </div>
+
+                <div class="para-add-form">
+                    <div class="para-add-row">
+                        <label for="new-para-num">Aller au §</label>
+                        <input type="number" id="new-para-num" min="1" placeholder="N°" inputmode="numeric">
+                        <div class="sentiment-picker" role="radiogroup" aria-label="Sentiment">
+                            <button type="button" class="sentiment-btn neutral active" data-action="pick-sentiment" data-value="neutral" title="Neutre" aria-label="Neutre"></button>
+                            <button type="button" class="sentiment-btn positive" data-action="pick-sentiment" data-value="positive" title="Positif / bénéfique" aria-label="Positif"></button>
+                            <button type="button" class="sentiment-btn negative" data-action="pick-sentiment" data-value="negative" title="Piège / négatif" aria-label="Négatif"></button>
+                        </div>
+                    </div>
+                    <input type="text" id="new-para-note" placeholder="Note (clé d'argent, piège, +2 END, …) — optionnel">
+                    <div class="para-add-actions">
+                        <button class="btn btn-primary" data-action="add-paragraph">+ Ajouter</button>
+                        <button class="btn btn-back" data-action="reset-para-input">Reset</button>
+                    </div>
                 </div>
             </div>
 

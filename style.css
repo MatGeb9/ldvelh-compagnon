@@ -507,21 +507,124 @@ input:focus, select:focus, textarea:focus {
     padding: 0.8rem;
     margin-bottom: 1rem;
 }
+
 .current-paragraph label {
     font-weight: 700;
-    display: block;
-    margin-bottom: 0.3rem;
 }
-.para-controls {
+
+.current-para-header {
     display: flex;
     gap: 0.5rem;
     align-items: center;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px dashed var(--border);
+    margin-bottom: 0.7rem;
 }
-.para-controls input {
-    width: 100px;
+
+.current-para-header .current-para-label {
+    font-family: var(--font-title);
+    font-size: 1.05rem;
+    color: var(--ink);
+}
+
+.current-para-header input[type="number"] {
+    width: 80px;
     font-size: 1.3rem;
     font-family: var(--font-title);
     text-align: center;
+    background: var(--parchment);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    color: var(--red);
+    font-weight: bold;
+}
+
+.current-para-header input[readonly] {
+    cursor: default;
+    pointer-events: none;
+}
+
+.para-add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.para-add-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.para-add-row label {
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0;
+}
+
+.para-add-row input[type="number"] {
+    width: 90px;
+    font-size: 1.2rem;
+    font-family: var(--font-title);
+    text-align: center;
+    background: var(--parchment);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.35rem 0.5rem;
+}
+
+.sentiment-picker {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    margin-left: auto;
+}
+
+.sentiment-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--ink-light);
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+
+.sentiment-btn.neutral { background: #b0a78f; }
+.sentiment-btn.positive { background: var(--success); }
+.sentiment-btn.negative { background: var(--danger); }
+
+.sentiment-btn:hover {
+    transform: scale(1.1);
+}
+
+.sentiment-btn.active {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.35);
+    transform: scale(1.1);
+}
+
+#new-para-note {
+    width: 100%;
+    background: var(--parchment);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.45rem 0.6rem;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+}
+
+#new-para-note:focus {
+    outline: 2px solid var(--gold);
+    outline-offset: 1px;
+}
+
+.para-add-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
 }
 
 /* ---- Alertes ---- */
