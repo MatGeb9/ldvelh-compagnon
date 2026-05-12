@@ -79,7 +79,7 @@
                         <div class="add-row">
                             <input type="text" id="new-potion-name" placeholder="Nom" class="input-md">
                             <input type="text" id="new-potion-effect" placeholder="Effet" class="input-md">
-                            <input type="number" id="new-potion-doses" placeholder="Doses" class="input-xs" min="1" value="1" title="Nombre de doses">
+                            <input type="number" id="new-potion-doses" placeholder="Doses" class="input-xs" min="1" title="Nombre de doses (défaut 1 si vide)">
                             <select id="new-potion-stat" class="input-sm" title="Caractéristique restaurée quand bue"></select>
                             <button class="btn btn-small btn-primary" data-action="add-starting-potion">+ Potion</button>
                         </div>
@@ -133,6 +133,9 @@
             <!-- Section spéciale (Métamorphose, Magie, etc.) -->
             <div id="special-section" class="special-section hidden"></div>
 
+            <!-- Souvenirs des runs précédentes (cross-run memory) -->
+            <div id="para-memory-panel" class="para-memory-panel hidden"></div>
+
             <!-- Paragraphe actuel + formulaire d'ajout rapide -->
             <div class="current-paragraph">
                 <div class="current-para-header">
@@ -158,6 +161,49 @@
                         <button class="btn" data-action="undo-paragraph" title="Annule la dernière visite">&#x21B6; Undo</button>
                         <button class="btn btn-back" data-action="reset-para-input">Reset</button>
                     </div>
+
+                    <!-- Détails du paragraphe courant : ennemi, objet, or, prov, stat, mort -->
+                    <!-- Toute action ici applique le changement ET log un event sur le § courant pour les futures runs. -->
+                    <details class="para-details">
+                        <summary>Détails de ce paragraphe <span class="hint">(ennemi, objet, stats, mort…)</span></summary>
+                        <div class="para-details-grid">
+                            <div class="para-detail-row">
+                                <span class="para-detail-label">&#9876; Ennemi</span>
+                                <input type="text" id="para-enemy-name" placeholder="Nom" class="input-md">
+                                <input type="number" id="para-enemy-skill" placeholder="HAB" class="input-xs" min="1">
+                                <input type="number" id="para-enemy-stamina" placeholder="END" class="input-xs" min="1">
+                                <button class="btn btn-small btn-primary" data-action="add-para-enemy">+ Combat</button>
+                            </div>
+
+                            <div class="para-detail-row">
+                                <span class="para-detail-label">&#127890; Objet</span>
+                                <input type="text" id="para-item-name" placeholder="Nom" class="input-md">
+                                <input type="text" id="para-item-desc" placeholder="Description (opt.)" class="input-md">
+                                <button class="btn btn-small btn-primary" data-action="add-para-item">+ Inventaire</button>
+                            </div>
+
+                            <div class="para-detail-row">
+                                <span class="para-detail-label">&#129689; Or</span>
+                                <input type="number" id="para-gold-delta" placeholder="±" class="input-xs" inputmode="numeric">
+                                <button class="btn btn-small" data-action="apply-para-gold">Appliquer</button>
+                                <span class="para-detail-label">&#127838; Prov.</span>
+                                <input type="number" id="para-prov-delta" placeholder="±" class="input-xs" inputmode="numeric">
+                                <button class="btn btn-small" data-action="apply-para-prov">Appliquer</button>
+                            </div>
+
+                            <div class="para-detail-row">
+                                <span class="para-detail-label">&#916; Carac</span>
+                                <select id="para-stat-key" class="input-sm" title="Caractéristique à modifier"></select>
+                                <input type="number" id="para-stat-delta" placeholder="±" class="input-xs" inputmode="numeric">
+                                <button class="btn btn-small btn-primary" data-action="apply-para-stat" title="Applique le delta (gère bonus permanent si dépasse le max)">Appliquer</button>
+                            </div>
+
+                            <div class="para-detail-row para-detail-death-row">
+                                <button class="btn btn-small btn-danger" data-action="mark-para-death" title="Trace que tu es mort ici — ne touche pas tes stats">&#128128; Mort à ce paragraphe</button>
+                                <span class="para-detail-hint">Trace pour futures runs · stats inchangées · undo/new run toujours possibles</span>
+                            </div>
+                        </div>
+                    </details>
                 </div>
             </div>
 

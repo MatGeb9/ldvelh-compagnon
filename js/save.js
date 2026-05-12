@@ -58,6 +58,28 @@ export async function persistGame(game) {
   return putSaves(saves);
 }
 
+// Silent autosave variant — no modal on failure, returns { ok, error } so caller
+// can decide whether to surface anything (typically a single subtle toast).
+export function persistGameSilent(game) {
+  const data = { ...game };
+  delete data.adventureConfig;
+  data.timestamp = Date.now();
+
+  const saves = getSaves();
+  const existingIdx = saves.findIndex(
+    s => s.heroName === data.heroName && s.adventureType === data.adventureType
+  );
+  if (existingIdx >= 0) saves[existingIdx] = data;
+  else saves.push(data);
+
+  try {
+    localStorage.setItem(KEY, JSON.stringify(saves));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e };
+  }
+}
+
 export async function removeSave(idx) {
   const saves = getSaves();
   if (idx < 0 || idx >= saves.length) return { ok: false };

@@ -1,11 +1,54 @@
 import { rollDice } from './dice.js';
 import { el, modal, toast } from './dom.js';
-import { state, resolveConfig, resetCharCreate, createGameState, adjustStat, startNewRun, logDice } from './state.js';
-import { getSaves, persistGame, removeSave, exportSaves, importSaves } from './save.js';
+import { state, resolveConfig, resetCharCreate, createGameState, adjustStat, startNewRun, logDice, logParagraphEvent } from './state.js';
+import { getSaves, persistGame, persistGameSilent, removeSave, exportSaves, importSaves } from './save.js';
 import { getAdventureType } from './adventure-types.js';
 import * as combat from './combat.js';
 import * as render from './render.js';
 import { renderMap, zoomMapBy, fitMap, relayoutMap, unlockAllNodes } from './map.js';
+
+// ───────────────────────────────────────────────
+// Autosave (debounced, silent unless quota fails)
+// ───────────────────────────────────────────────
+
+// Actions that don't mutate state.game → skip autosave to avoid churn.
+// Everything else triggers a debounced autosave via the click/change/input dispatcher.
+const NO_AUTOSAVE_ACTIONS = new Set([
+  // Navigation
+  'new-game', 'load-game', 'back-home', 'back-home-load', 'back-adventure',
+  // Char-create flow (state.game doesn't exist yet)
+  'select-adventure', 'roll-stat', 'roll-all', 'start-adventure',
+  'add-custom-stat', 'remove-custom-stat',
+  'add-starting-potion', 'remove-starting-potion',
+  'add-starting-object', 'remove-starting-object',
+  // Pure UI / view state
+  'tab', 'para-history', 'filter-paragraphs', 'pick-sentiment', 'reset-para-input',
+  'map-zoom-in', 'map-zoom-out', 'map-fit', 'map-relayout',
+  'menu', 'menu-close', 'menu-quit', 'dice-close',
+  // Already triggers an explicit save (loud)
+  'save', 'menu-save',
+  // Save-screen housekeeping (don't autosave during these — load triggers full re-render)
+  'load-save', 'delete-save', 'export-saves', 'import-saves-trigger',
+]);
+
+let autoSaveTimer = null;
+let autoSaveWarned = false;
+
+function requestAutoSave() {
+  if (!state.game) return;
+  if (autoSaveTimer) return; // already scheduled; coalesce
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null;
+    if (!state.game) return;
+    const result = persistGameSilent(state.game);
+    if (!result.ok && !autoSaveWarned) {
+      autoSaveWarned = true;
+      toast('Autosave échoué — stockage plein ? Exporte tes saves.', 'error', 4500);
+    } else if (result.ok && autoSaveWarned) {
+      autoSaveWarned = false;
+    }
+  }, 400);
+}
 
 // ───────────────────────────────────────────────
 // Action handlers — one entry per data-action value
@@ -33,10 +76,10 @@ const actions = {
     // Deep-clone stats so user customisations don't pollute the shared ADVENTURE_TYPES.
     state.selectedAdventure = { ...adv, stats: adv.stats.map(s => ({ ...s })) };
     state.rolledStats = {};
-    // Initial equipment defaults: empty potions/objects (let user opt in), provisions from adventure default
+    // Initial equipment: tout à 0 / vide — l'user choisit explicitement à la création.
     state.startingEquipment = {
       gold: 0,
-      provisions: adv.defaultProvisions || 0,
+      provisions: 0,
       potions: [],
       objects: [],
     };
@@ -73,7 +116,7 @@ const actions = {
     const doses = Math.max(1, parseInt(dosesInp.value) || 1);
     const stat = statSel.value || '';
     state.startingEquipment.potions.push({ name, effect, doses, stat, used: 0 });
-    nameInp.value = ''; effInp.value = ''; dosesInp.value = '1'; statSel.value = '';
+    nameInp.value = ''; effInp.value = ''; dosesInp.value = ''; statSel.value = '';
     render.renderStartingEquipment();
   },
   'remove-starting-potion': (target) => {
@@ -118,10 +161,12 @@ const actions = {
     state.game.paragraphHistory.push(num);
     if (!state.game.paragraphs) state.game.paragraphs = {};
     if (!state.game.paragraphs[num]) {
-      state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+      state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
     }
     render.renderParagraphs();
+    render.renderParagraphMemory();
     renderMap();
+    requestAutoSave();
   },
 
   // Game header
@@ -285,7 +330,7 @@ const actions = {
 
     if (!state.game.paragraphs) state.game.paragraphs = {};
     if (!state.game.paragraphs[num]) {
-      state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+      state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
     }
     // Apply sentiment only if user explicitly picked something other than neutral
     if (sentiment && sentiment !== 'neutral') {
@@ -309,7 +354,9 @@ const actions = {
     // Update displays
     el('current-para').value = num;
     render.renderParagraphs();
+    render.renderParagraphMemory();
     renderMap(); // refresh map even if tab not visible — keeps it in sync
+    requestAutoSave();
 
     // Return focus to number input for fast sequential entry
     numInp.focus();
@@ -336,7 +383,7 @@ const actions = {
     const note = noteInp.value.trim();
     if (!state.game.paragraphs) state.game.paragraphs = {};
     const isNew = !state.game.paragraphs[num];
-    if (isNew) state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+    if (isNew) state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
     if (sentiment && sentiment !== 'neutral') state.game.paragraphs[num].sentiment = sentiment;
     if (note) state.game.paragraphs[num].note = note;
     // No paragraphHistory.push → pas de visite, pas d'arête sur la carte
@@ -348,7 +395,9 @@ const actions = {
       b.classList.toggle('active', b.dataset.value === 'neutral');
     });
     render.renderParagraphs();
+    render.renderParagraphMemory();
     renderMap();
+    requestAutoSave();
     numInp.focus();
     toast(`§${num} ajouté à la carte (sans visite)`, 'info', 1800);
   },
@@ -372,7 +421,9 @@ const actions = {
     state.game.currentParagraph = i >= 0 ? history[i] : 1;
     el('current-para').value = state.game.currentParagraph;
     render.renderParagraphs();
+    render.renderParagraphMemory();
     renderMap();
+    requestAutoSave();
     toast(`§${removed} retiré de l'historique`, 'info', 1800);
   },
   'cycle-sentiment': (target) => {
@@ -403,6 +454,153 @@ const actions = {
     if (!state.game.paragraphHistory) return;
     state.game.paragraphHistory.splice(idx, 1);
     render.renderParagraphs();
+  },
+
+  // ─── Détails du paragraphe courant (logs cross-run) ───
+  'add-para-enemy': () => {
+    if (!state.game) return;
+    const nameInp = el('para-enemy-name');
+    const skillInp = el('para-enemy-skill');
+    const stamInp = el('para-enemy-stamina');
+    const name = nameInp.value.trim();
+    const skill = parseInt(skillInp.value);
+    const stamina = parseInt(stamInp.value);
+    if (!name || !Number.isFinite(skill) || !Number.isFinite(stamina)) {
+      toast('Remplis nom, HAB et END', 'warn', 1800);
+      nameInp.focus();
+      return;
+    }
+    state.game.adversaries.push({
+      name, skill, skillMax: skill, stamina, staminaMax: stamina, defeated: false,
+    });
+    logParagraphEvent(state.game.currentParagraph, 'enemy', { name, skill, stamina });
+    nameInp.value = ''; skillInp.value = ''; stamInp.value = '';
+    render.renderAdversaries();
+    render.updateCombatButtons();
+    render.renderParagraphMemory();
+    render.renderParagraphs();
+    toast(`⚔️ ${name} en combat + loggé §${state.game.currentParagraph}`, 'success', 2000);
+    requestAutoSave();
+  },
+  'add-para-item': () => {
+    if (!state.game) return;
+    const nameInp = el('para-item-name');
+    const descInp = el('para-item-desc');
+    const name = nameInp.value.trim();
+    if (!name) { nameInp.focus(); return; }
+    const desc = descInp.value.trim();
+    if (!state.game.objects) state.game.objects = [];
+    state.game.objects.push({ name, desc });
+    logParagraphEvent(state.game.currentParagraph, 'item', { name, desc });
+    nameInp.value = ''; descInp.value = '';
+    render.renderObjects();
+    render.renderParagraphMemory();
+    render.renderParagraphs();
+    toast(`🎒 ${name} ajouté + loggé §${state.game.currentParagraph}`, 'success', 2000);
+    requestAutoSave();
+  },
+  'apply-para-gold': () => {
+    if (!state.game) return;
+    const inp = el('para-gold-delta');
+    const delta = parseInt(inp.value);
+    if (!Number.isFinite(delta) || delta === 0) { inp.focus(); return; }
+    state.game.gold = Math.max(0, (state.game.gold || 0) + delta);
+    el('gold-amount').value = state.game.gold;
+    logParagraphEvent(state.game.currentParagraph, 'gold', { delta });
+    inp.value = '';
+    render.renderParagraphMemory();
+    toast(`💰 ${delta > 0 ? '+' : ''}${delta} Or`, delta < 0 ? 'warn' : 'success', 1800);
+    requestAutoSave();
+  },
+  'apply-para-prov': () => {
+    if (!state.game) return;
+    const inp = el('para-prov-delta');
+    const delta = parseInt(inp.value);
+    if (!Number.isFinite(delta) || delta === 0) { inp.focus(); return; }
+    state.game.provisions = Math.max(0, (state.game.provisions || 0) + delta);
+    el('provisions-amount').value = state.game.provisions;
+    logParagraphEvent(state.game.currentParagraph, 'prov', { delta });
+    inp.value = '';
+    render.renderParagraphMemory();
+    toast(`🍞 ${delta > 0 ? '+' : ''}${delta} Provisions`, delta < 0 ? 'warn' : 'success', 1800);
+    requestAutoSave();
+  },
+  'apply-para-stat': async () => {
+    if (!state.game) return;
+    const keySel = el('para-stat-key');
+    const deltaInp = el('para-stat-delta');
+    const key = keySel.value;
+    const delta = parseInt(deltaInp.value);
+    if (!key || !Number.isFinite(delta) || delta === 0) {
+      deltaInp.focus();
+      return;
+    }
+    const game = state.game;
+    const config = resolveConfig(game);
+    const statDef = config.stats.find(s => s.key === key);
+    const statName = statDef?.name || key;
+    const current = game.stats[key];
+    const max = game.statsMax[key];
+    const newCurrent = current + delta;
+    let permanentBonus = false;
+
+    // Bonus permanent dialog — reuse the same logic as stat-delta-apply
+    if (delta > 0 && newCurrent > max) {
+      const choice = await modal.choice(
+        `${statName} : ${current} + ${delta} = ${newCurrent} dépasserait le maximum (${max}).\n\n` +
+        `Plafonner à ${max} = simple soin\n` +
+        `Bonus permanent = augmente aussi le max (objet magique)`,
+        [
+          { label: 'Annuler', value: null, class: 'btn-back' },
+          { label: `Plafonner à ${max}`, value: 'cap', class: 'btn-secondary' },
+          { label: `Bonus permanent (+${newCurrent - max})`, value: 'boost', class: 'btn-primary' },
+        ],
+        `Dépasser le maximum ?`
+      );
+      if (!choice) { deltaInp.focus(); return; }
+      if (choice === 'boost') {
+        game.statsMax[key] = newCurrent;
+        game.stats[key] = newCurrent;
+        permanentBonus = true;
+      } else {
+        game.stats[key] = max;
+      }
+    } else {
+      const wasDeath = adjustStat(key, delta);
+      if (wasDeath) {
+        modal.alert("Votre héros est mort ! Son endurance est tombée à 0.", 'Mort');
+      }
+    }
+
+    logParagraphEvent(state.game.currentParagraph, 'stat', {
+      key, name: statName, delta, permanentBonus,
+    });
+    deltaInp.value = '';
+    render.renderStats();
+    render.renderParagraphMemory();
+    render.renderParagraphs();
+    toast(
+      `${statName} : ${delta > 0 ? '+' : ''}${delta}${permanentBonus ? ' (perm)' : ''}`,
+      delta < 0 ? 'warn' : 'success',
+      1800
+    );
+    requestAutoSave();
+  },
+  'mark-para-death': async () => {
+    if (!state.game) return;
+    const cur = state.game.currentParagraph;
+    const ok = await modal.confirm(
+      `Marquer §${cur} comme lieu de mort ?\n\n` +
+      `Tes stats ne sont PAS modifiées — c'est juste une trace pour les futures runs.\n` +
+      `Tu peux toujours undo, lancer une nouvelle run, ou continuer.`,
+      'Mort à ce paragraphe'
+    );
+    if (!ok) return;
+    logParagraphEvent(cur, 'death', {});
+    render.renderParagraphMemory();
+    render.renderParagraphs();
+    toast(`💀 Mort loggée au §${cur}`, 'warn', 2500);
+    requestAutoSave();
   },
 
   // Combat
@@ -597,7 +795,7 @@ async function startAdventure() {
   const provInp = el('starting-provisions');
   const equipment = {
     gold: parseInt(goldInp?.value) || 0,
-    provisions: parseInt(provInp?.value) || (adv.defaultProvisions || 0),
+    provisions: parseInt(provInp?.value) || 0,
     potions: state.startingEquipment.potions,
     objects: state.startingEquipment.objects,
   };
@@ -771,11 +969,18 @@ function loadGame(idx) {
   if (!state.game.paragraphs) {
     state.game.paragraphs = {};
     (state.game.paragraphHistory || []).forEach(num => {
-      if (!state.game.paragraphs[num]) {
-        state.game.paragraphs[num] = { sentiment: 'neutral', note: '' };
+      if (num != null && !state.game.paragraphs[num]) {
+        state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
       }
     });
   }
+  // Migration: every paragraph entry gets an events[] array (cross-run memory).
+  // Old saves had only {sentiment, note} — events default to [] (no memories yet, normal).
+  Object.values(state.game.paragraphs).forEach(p => {
+    if (!Array.isArray(p.events)) p.events = [];
+  });
+  // Migration: runCount missing on saves created before the field existed → default 1.
+  if (!state.game.runCount) state.game.runCount = 1;
   render.showScreen('screen-game');
   render.renderGameScreen();
 }
@@ -785,26 +990,31 @@ function loadGame(idx) {
 // ───────────────────────────────────────────────
 
 export function attachEvents() {
+  // Wrapper: runs handler, then schedules autosave if action is stateful.
+  // Awaits handler return value to capture async state changes (e.g., handlers
+  // that open a modal and only mutate after the user clicks).
+  function dispatch(action, target, e) {
+    const handler = actions[action];
+    if (!handler) return;
+    if (target.tagName === 'BUTTON' && target.disabled) return;
+    const result = handler(target, e);
+    if (state.game && !NO_AUTOSAVE_ACTIONS.has(action)) {
+      Promise.resolve(result).then(() => requestAutoSave()).catch(() => {});
+    }
+  }
+
   // Delegated click handler for all [data-action] elements
   document.addEventListener('click', (e) => {
     const target = e.target.closest('[data-action]');
     if (!target) return;
-    const action = target.dataset.action;
-    const handler = actions[action];
-    if (!handler) return;
-    // Skip disabled buttons
-    if (target.tagName === 'BUTTON' && target.disabled) return;
-    handler(target, e);
+    dispatch(target.dataset.action, target, e);
   });
 
   // Delegated change handler for checkboxes that opt in via data-action
   document.addEventListener('change', (e) => {
     const target = e.target.closest('[data-action]');
     if (!target) return;
-    if (target.type === 'checkbox') {
-      const handler = actions[target.dataset.action];
-      if (handler) handler(target, e);
-    }
+    if (target.type === 'checkbox') dispatch(target.dataset.action, target, e);
   });
 
   // Delegated input handler for text inputs (used for live note editing on paragraphs)
@@ -812,8 +1022,7 @@ export function attachEvents() {
     const target = e.target.closest('[data-action]');
     if (!target) return;
     if (target.tagName === 'INPUT' && target.type !== 'checkbox') {
-      const handler = actions[target.dataset.action];
-      if (handler) handler(target, e);
+      dispatch(target.dataset.action, target, e);
     }
   });
 
@@ -834,10 +1043,12 @@ export function attachEvents() {
   el('gold-amount').addEventListener('change', () => {
     if (!state.game) return;
     state.game.gold = Math.max(0, parseInt(el('gold-amount').value) || 0);
+    requestAutoSave();
   });
   el('provisions-amount').addEventListener('change', () => {
     if (!state.game) return;
     state.game.provisions = Math.max(0, parseInt(el('provisions-amount').value) || 0);
+    requestAutoSave();
   });
   el('alert-input').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') addAlertFromInput();
@@ -846,7 +1057,10 @@ export function attachEvents() {
     if (e.key === 'Enter') addObjectFromInputs();
   });
   el('game-notes').addEventListener('input', () => {
-    if (state.game) state.game.notes = el('game-notes').value;
+    if (state.game) {
+      state.game.notes = el('game-notes').value;
+      requestAutoSave();
+    }
   });
 
   // Import file picker — handled here because it's a 'change' on a file input

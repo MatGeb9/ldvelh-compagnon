@@ -68,7 +68,8 @@ export function createGameState({ adventure, heroName, bookTitle, rolledStats, s
     notes: '',
     currentParagraph: 1,
     paragraphHistory: [1],
-    paragraphs: { 1: { sentiment: 'neutral', note: '' } },
+    paragraphs: { 1: { sentiment: 'neutral', note: '', events: [] } },
+    runCount: 1,
     diceLog: [],                  // [{ rolls, modifier, modifierLabel, total, label, ts }] — bounded to 10
     mapLockedPositions: {},       // { num: { x, y } } — manual node placements on the map
     combatMode: 'simultaneous',   // 'simultaneous' (default, attacks all adversaries) | 'sequential' (one at a time, by target)
@@ -177,7 +178,8 @@ export function startNewRun(game, { reroll = false } = {}) {
   }
   game.paragraphHistory.push(1);
   if (!game.paragraphs) game.paragraphs = {};
-  if (!game.paragraphs[1]) game.paragraphs[1] = { sentiment: 'neutral', note: '' };
+  if (!game.paragraphs[1]) game.paragraphs[1] = { sentiment: 'neutral', note: '', events: [] };
+  if (!Array.isArray(game.paragraphs[1].events)) game.paragraphs[1].events = [];
 
   // Run counter for UX
   game.runCount = (game.runCount || 1) + 1;
@@ -192,6 +194,47 @@ export function logDice({ rolls, modifier = 0, modifierLabel = '', total, label 
   if (state.game.diceLog.length > 10) {
     state.game.diceLog = state.game.diceLog.slice(-10);
   }
+}
+
+// Append an event to a paragraph's cross-run memory. Returns the event.
+// Auto-suggests sentiment for first-time logs (death → negative, item → positive)
+// only when current sentiment is the default 'neutral' AND no prior events exist.
+export function logParagraphEvent(num, type, data = {}) {
+  const game = state.game;
+  if (!game || num == null) return null;
+  if (!game.paragraphs) game.paragraphs = {};
+  if (!game.paragraphs[num]) {
+    game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
+  }
+  const p = game.paragraphs[num];
+  if (!Array.isArray(p.events)) p.events = [];
+  const wasEmpty = p.events.length === 0;
+  const event = {
+    run: game.runCount || 1,
+    type,
+    data,
+    ts: Date.now(),
+  };
+  p.events.push(event);
+  // Auto-sentiment only when neutral AND first event — don't override later decisions
+  if (wasEmpty && (p.sentiment === 'neutral' || !p.sentiment)) {
+    if (type === 'death') p.sentiment = 'negative';
+    else if (type === 'item') p.sentiment = 'positive';
+  }
+  return event;
+}
+
+// Returns the set of paragraph numbers visited DIRECTLY AFTER `num` in any past traversal.
+// Respects run boundaries: a `null` marker breaks the adjacency.
+export function getNeighborsFromHistory(num) {
+  const history = state.game?.paragraphHistory || [];
+  const set = new Set();
+  for (let i = 0; i < history.length - 1; i++) {
+    if (history[i] === num && history[i + 1] != null && history[i + 1] !== num) {
+      set.add(history[i + 1]);
+    }
+  }
+  return [...set].sort((a, b) => a - b);
 }
 
 // Adjust a stat with bounds (0 .. statsMax[key]).

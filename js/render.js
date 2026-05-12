@@ -1,6 +1,6 @@
 import { ADVENTURE_TYPES, getAdventureType } from './adventure-types.js';
 import { el, escapeHtml, html, raw } from './dom.js';
-import { state, resolveConfig } from './state.js';
+import { state, resolveConfig, getNeighborsFromHistory } from './state.js';
 import { getSaves, getLastExportInfo } from './save.js';
 
 // ──────────── Navigation ────────────
@@ -48,7 +48,7 @@ export function renderCharCreate(adv) {
   const goldInp = el('starting-gold');
   const provInp = el('starting-provisions');
   if (goldInp) goldInp.value = state.startingEquipment.gold ?? 0;
-  if (provInp) provInp.value = state.startingEquipment.provisions ?? (adv.defaultProvisions || 0);
+  if (provInp) provInp.value = state.startingEquipment.provisions ?? 0;
   // Live-sync gold/provisions inputs back to state (so 'Nouvelle run' reset can rebuild correctly)
   if (goldInp && !goldInp.dataset.bound) {
     goldInp.addEventListener('input', () => {
@@ -232,11 +232,25 @@ export function renderGameScreen() {
   renderInventory();
   renderParagraphs();
   renderDiceLog();
+  renderParagraphDetailsStatSelect();
+  renderParagraphMemory();
   el('current-para').value = game.currentParagraph;
   el('game-notes').value = game.notes || '';
   el('gold-amount').value = game.gold;
   el('provisions-amount').value = game.provisions;
   updateCombatButtons();
+}
+
+// Populate the stat <select> in the "Détails paragraphe" form with the current
+// game's stat keys. Called once per game load — stats don't change mid-game.
+export function renderParagraphDetailsStatSelect() {
+  const sel = el('para-stat-key');
+  if (!sel || !state.game) return;
+  const config = resolveConfig(state.game);
+  if (!config?.stats) return;
+  sel.innerHTML = config.stats
+    .map(s => `<option value="${escapeHtml(s.key)}">${escapeHtml(s.name)}</option>`)
+    .join('');
 }
 
 export function renderStats() {
@@ -441,6 +455,129 @@ export function renderDiceLog() {
     `;
     container.appendChild(row);
   });
+}
+
+// ──────────── Paragraph memory (cross-run hints panel) ────────────
+
+const EVENT_ICON = {
+  death: '💀',
+  enemy: '⚔️',
+  item: '🎒',
+  gold: '💰',
+  prov: '🍞',
+  stat: '±',
+};
+
+function formatEvent(ev) {
+  const tag = `<span class="memory-run-tag">Run ${ev.run}</span>`;
+  switch (ev.type) {
+    case 'death':
+      return html`<span class="memory-event-text"><strong>${raw(EVENT_ICON.death)} Mort ici</strong></span>${raw(tag)}`;
+    case 'enemy':
+      return html`<span class="memory-event-text"><strong>${raw(EVENT_ICON.enemy)} ${ev.data.name}</strong> (HAB ${ev.data.skill} · END ${ev.data.stamina})</span>${raw(tag)}`;
+    case 'item':
+      return html`<span class="memory-event-text"><strong>${raw(EVENT_ICON.item)} ${ev.data.name}</strong>${ev.data.desc ? raw(' — ' + escapeHtml(ev.data.desc)) : ''}</span>${raw(tag)}`;
+    case 'gold': {
+      const sign = ev.data.delta > 0 ? '+' : '';
+      return html`<span class="memory-event-text"><strong>${raw(EVENT_ICON.gold)} ${sign}${ev.data.delta} Or</strong></span>${raw(tag)}`;
+    }
+    case 'prov': {
+      const sign = ev.data.delta > 0 ? '+' : '';
+      return html`<span class="memory-event-text"><strong>${raw(EVENT_ICON.prov)} ${sign}${ev.data.delta} Prov</strong></span>${raw(tag)}`;
+    }
+    case 'stat': {
+      const sign = ev.data.delta > 0 ? '+' : '';
+      const perm = ev.data.permanentBonus ? ' (perm.)' : '';
+      return html`<span class="memory-event-text"><strong>${raw(EVENT_ICON.stat)}${sign}${ev.data.delta} ${ev.data.name}${perm}</strong></span>${raw(tag)}`;
+    }
+    default:
+      return escapeHtml(JSON.stringify(ev.data));
+  }
+}
+
+// Compact summary of all events at a paragraph (used in neighbor lines).
+function summarizeEvents(events) {
+  if (!events || events.length === 0) return '';
+  const byType = new Map();
+  events.forEach(ev => {
+    if (!byType.has(ev.type)) byType.set(ev.type, []);
+    byType.get(ev.type).push(ev);
+  });
+  const parts = [];
+  if (byType.has('death')) parts.push('💀 mort');
+  if (byType.has('enemy')) {
+    parts.push(`⚔️ ${byType.get('enemy').map(e => e.data.name).join(', ')}`);
+  }
+  if (byType.has('item')) {
+    parts.push(`🎒 ${byType.get('item').map(e => e.data.name).join(', ')}`);
+  }
+  if (byType.has('gold')) {
+    const total = byType.get('gold').reduce((s, e) => s + e.data.delta, 0);
+    parts.push(`💰 ${total > 0 ? '+' : ''}${total}`);
+  }
+  if (byType.has('prov')) {
+    const total = byType.get('prov').reduce((s, e) => s + e.data.delta, 0);
+    parts.push(`🍞 ${total > 0 ? '+' : ''}${total}`);
+  }
+  if (byType.has('stat')) {
+    parts.push(
+      byType.get('stat')
+        .map(e => `${e.data.delta > 0 ? '+' : ''}${e.data.delta} ${e.data.name}`)
+        .join(', ')
+    );
+  }
+  return parts.join(' · ');
+}
+
+export function renderParagraphMemory() {
+  const panel = el('para-memory-panel');
+  if (!panel) return;
+  const game = state.game;
+  if (!game) { panel.innerHTML = ''; panel.classList.add('hidden'); return; }
+
+  const cur = game.currentParagraph;
+  const paragraphs = game.paragraphs || {};
+  const hereEvents = paragraphs[cur]?.events || [];
+  const neighbors = getNeighborsFromHistory(cur);
+
+  // Hide the panel entirely when there's nothing to show — first run, no memory yet
+  if (hereEvents.length === 0 && neighbors.length === 0) {
+    panel.innerHTML = '';
+    panel.classList.add('hidden');
+    return;
+  }
+  panel.classList.remove('hidden');
+
+  let out = `<div class="memory-header">📜 Souvenirs · §${cur}</div>`;
+
+  if (hereEvents.length > 0) {
+    out += `<div class="memory-section"><div class="memory-section-title">Ici (toutes runs)</div>`;
+    // Sort by run then ts (chronological within run)
+    const sorted = [...hereEvents].sort((a, b) => (a.run - b.run) || (a.ts - b.ts));
+    sorted.forEach(ev => {
+      out += `<div class="memory-event memory-event-${ev.type}">${formatEvent(ev)}</div>`;
+    });
+    out += `</div>`;
+  }
+
+  if (neighbors.length > 0) {
+    out += `<div class="memory-section"><div class="memory-section-title">Depuis ici, runs précédentes :</div>`;
+    neighbors.forEach(n => {
+      const events = paragraphs[n]?.events || [];
+      const summary = summarizeEvents(events);
+      const sentiment = paragraphs[n]?.sentiment || 'neutral';
+      const noteText = paragraphs[n]?.note || '';
+      const previewText = summary || (noteText ? `📝 ${noteText}` : '(visité, aucun détail loggé)');
+      out += html`<div class="memory-neighbor">
+        <span class="sentiment-dot ${sentiment}" aria-hidden="true"></span>
+        <button class="btn btn-small memory-neighbor-jump" data-action="jump-to-paragraph" data-num="${n}" title="Aller au §${n}">§${n}</button>
+        <span class="memory-neighbor-summary">${raw(escapeHtml(previewText))}</span>
+      </div>`;
+    });
+    out += `</div>`;
+  }
+
+  panel.innerHTML = out;
 }
 
 // ──────────── Paragraph history (rich) ────────────

@@ -1606,6 +1606,192 @@ textarea {
 .toast-error   { border-color: var(--danger); }
 .toast-info    { border-color: var(--info); }
 
+/* ---- Souvenirs des runs précédentes (panneau cross-run) ---- */
+.para-memory-panel {
+    background: linear-gradient(135deg, var(--parchment-light) 0%, #fff8e6 100%);
+    border: 2px solid var(--gold-dark);
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    margin-bottom: 0.8rem;
+    box-shadow: 0 2px 8px rgba(212, 160, 23, 0.15);
+}
+
+.memory-header {
+    font-family: var(--font-title);
+    font-size: 1.05rem;
+    color: var(--gold-dark);
+    margin-bottom: 0.5rem;
+    border-bottom: 1px dashed var(--gold-dark);
+    padding-bottom: 0.3rem;
+}
+
+.memory-section {
+    margin-bottom: 0.5rem;
+}
+
+.memory-section:last-child {
+    margin-bottom: 0;
+}
+
+.memory-section-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--ink-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.3rem;
+}
+
+.memory-event {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    margin-bottom: 0.2rem;
+    background: var(--parchment);
+    border-left: 3px solid var(--ink-light);
+    border-radius: 4px;
+    font-size: 0.92rem;
+}
+
+.memory-event-death { border-left-color: var(--danger); background: #fff0f0; }
+.memory-event-enemy { border-left-color: #b8410a; }
+.memory-event-item { border-left-color: var(--success); background: #f0fff0; }
+.memory-event-gold { border-left-color: var(--gold); }
+.memory-event-prov { border-left-color: var(--green); }
+.memory-event-stat { border-left-color: var(--info); }
+
+.memory-event-text {
+    flex: 1;
+    color: var(--ink);
+}
+
+.memory-run-tag {
+    font-size: 0.75rem;
+    padding: 1px 6px;
+    background: var(--ink);
+    color: var(--parchment);
+    border-radius: 8px;
+    flex-shrink: 0;
+    font-family: var(--font-body);
+}
+
+.memory-neighbor {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.5rem;
+    margin-bottom: 0.2rem;
+    background: var(--parchment);
+    border-radius: 4px;
+}
+
+.memory-neighbor .sentiment-dot {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    border-width: 1.5px;
+    cursor: default;
+}
+
+.memory-neighbor-jump {
+    font-family: var(--font-title);
+    color: var(--red);
+    padding: 0.15rem 0.55rem;
+    background: var(--parchment-light);
+    border-color: var(--gold-dark);
+    flex-shrink: 0;
+}
+
+.memory-neighbor-summary {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+/* ---- Détails du paragraphe (form ennemi/objet/stat/mort) ---- */
+.para-details {
+    margin-top: 0.6rem;
+    background: var(--parchment-dark);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+}
+
+.para-details > summary {
+    font-family: var(--font-title);
+    font-size: 0.95rem;
+    color: var(--ink);
+    cursor: pointer;
+    padding: 0.2rem 0;
+    list-style: revert;
+}
+
+.para-details > summary .hint {
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    color: var(--ink-light);
+    font-style: italic;
+    margin-left: 0.4rem;
+}
+
+.para-details[open] > summary {
+    margin-bottom: 0.5rem;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 0.3rem;
+}
+
+.para-details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.para-detail-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.para-detail-label {
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--ink);
+    min-width: 70px;
+}
+
+.para-detail-row input[type="text"],
+.para-detail-row input[type="number"],
+.para-detail-row select {
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--parchment-light);
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+}
+
+.para-detail-row .input-xs { width: 60px; }
+.para-detail-row .input-sm { min-width: 120px; }
+.para-detail-row .input-md { flex: 1; min-width: 100px; }
+
+.para-detail-death-row {
+    border-top: 1px dashed var(--border);
+    padding-top: 0.4rem;
+    margin-top: 0.2rem;
+}
+
+.para-detail-hint {
+    font-size: 0.78rem;
+    color: var(--ink-light);
+    font-style: italic;
+    flex: 1;
+    min-width: 200px;
+}
+
 /* ---- Modal custom (alert/confirm) ---- */
 .modal-overlay {
     position: fixed;
