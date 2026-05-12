@@ -1,9 +1,22 @@
-// Mind-map SVG des paragraphes : layout force-directed + pan/pinch-zoom iPad
+// Mind-map SVG des paragraphes — layout hiérarchique gauche-droite (Sugiyama-style).
+// Chaque colonne = une "profondeur" BFS depuis le 1er § visité.
+// Forward edges (col N → col N+1) : trait droit.
+// Back edges (retour en arrière, boucle) : courbe rouge pointillée.
+// Drag d'un nœud = épinglage manuel persisté dans game.mapLockedPositions.
 import { el, escapeHtml } from './dom.js';
 import { state } from './state.js';
 
-const VIEW_W = 800;
-const VIEW_H = 600;
+const COL_W = 130;        // horizontal spacing between columns
+const ROW_H = 75;         // vertical spacing between nodes in same column
+const MARGIN_X = 60;
+const MARGIN_Y = 50;
+const NODE_R_DEFAULT = 18;
+const NODE_R_CURRENT = 22;
+const MIN_W = 400;
+const MIN_H = 300;
+
+// Natural (untransformed) viewBox dimensions of the current render — used by fitMap.
+let currentDims = { width: MIN_W, height: MIN_H };
 
 function buildGraph(game) {
   const nodeSet = new Set();
@@ -22,96 +35,133 @@ function buildGraph(game) {
     const key = `${a}->${b}`;
     if (!edgeMap.has(key)) edgeMap.set(key, { a, b });
   }
-  // Add any standalone nodes from non-null entries (in case some appear only at the start of a run)
   history.forEach(n => { if (n !== null) nodeSet.add(n); });
 
   return { nodes: [...nodeSet], edges: [...edgeMap.values()] };
 }
 
-// Fruchterman-Reingold (simplifié) — converge en ~250 itérations pour ~100 nœuds
-// `locked` est une map { nodeId: {x, y} } pour les positions épinglées (drag manuel utilisateur).
-function computeLayout(nodes, edges, width, height, iterations = 250, locked = {}) {
-  if (nodes.length === 0) return {};
-  if (nodes.length === 1) {
-    const only = nodes[0];
-    return { [only]: locked[only] ? { ...locked[only] } : { x: width / 2, y: height / 2 } };
+// Hierarchical layout: assign each node a depth (= BFS distance from start),
+// group by depth into columns, sort within columns to minimise edge crossings
+// using barycenter heuristic (5 sweeps both directions).
+function computeHierarchicalLayout(nodes, edges, locked = {}) {
+  if (nodes.length === 0) {
+    return { pos: {}, width: MIN_W, height: MIN_H, depth: new Map() };
   }
 
-  const pos = {};
-  const vel = {};
-  const cx = width / 2, cy = height / 2;
-  const initR = Math.min(width, height) / 3;
-  nodes.forEach((n, i) => {
-    if (locked[n]) {
-      pos[n] = { x: locked[n].x, y: locked[n].y };
-    } else {
-      const angle = (i / nodes.length) * Math.PI * 2;
-      pos[n] = { x: cx + Math.cos(angle) * initR, y: cy + Math.sin(angle) * initR };
-    }
-    vel[n] = { x: 0, y: 0 };
+  // Directed adjacency
+  const outAdj = new Map();
+  const inAdj = new Map();
+  nodes.forEach(n => { outAdj.set(n, []); inAdj.set(n, []); });
+  edges.forEach(({ a, b }) => {
+    if (a === b) return;
+    outAdj.get(a)?.push(b);
+    inAdj.get(b)?.push(a);
   });
 
-  const area = width * height;
-  const k = Math.sqrt(area / nodes.length) * 0.55;
-  const kRep = k * k;
+  // Pick the start node: first non-null entry in paragraphHistory, fallback to §1, else first node.
+  const history = state.game?.paragraphHistory || [];
+  const firstVisit = history.find(n => n != null);
+  let start = nodes[0];
+  if (firstVisit != null && nodes.includes(firstVisit)) start = firstVisit;
+  else if (nodes.includes(1)) start = 1;
 
-  for (let iter = 0; iter < iterations; iter++) {
-    const cooling = 1 - iter / iterations;
-
-    // Repulsion (every pair) — O(n²)
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i], b = nodes[j];
-        let dx = pos[a].x - pos[b].x;
-        let dy = pos[a].y - pos[b].y;
-        let dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 0.01) { dx = (Math.random() - 0.5); dy = (Math.random() - 0.5); dist = 1; }
-        const force = kRep / dist;
-        vel[a].x += (dx / dist) * force;
-        vel[a].y += (dy / dist) * force;
-        vel[b].x -= (dx / dist) * force;
-        vel[b].y -= (dy / dist) * force;
+  // BFS depth assignment over outgoing edges
+  const depth = new Map();
+  depth.set(start, 0);
+  const queue = [start];
+  while (queue.length > 0) {
+    const u = queue.shift();
+    (outAdj.get(u) || []).forEach(v => {
+      if (!depth.has(v)) {
+        depth.set(v, depth.get(u) + 1);
+        queue.push(v);
       }
-    }
-
-    // Attraction along edges
-    edges.forEach(({ a, b }) => {
-      const dx = pos[a].x - pos[b].x;
-      const dy = pos[a].y - pos[b].y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const force = (dist * dist) / k;
-      vel[a].x -= (dx / dist) * force;
-      vel[a].y -= (dy / dist) * force;
-      vel[b].x += (dx / dist) * force;
-      vel[b].y += (dy / dist) * force;
-    });
-
-    // Apply velocities with cooling + damping (skip locked nodes — they stay pinned)
-    const maxV = 30 * cooling;
-    nodes.forEach(n => {
-      if (locked[n]) {
-        pos[n].x = locked[n].x;
-        pos[n].y = locked[n].y;
-        return;
-      }
-      let vx = vel[n].x * 0.04;
-      let vy = vel[n].y * 0.04;
-      vx = Math.max(-maxV, Math.min(maxV, vx));
-      vy = Math.max(-maxV, Math.min(maxV, vy));
-      pos[n].x += vx;
-      pos[n].y += vy;
-      vel[n].x *= 0.85;
-      vel[n].y *= 0.85;
-      // Clamp to bounds
-      pos[n].x = Math.max(35, Math.min(width - 35, pos[n].x));
-      pos[n].y = Math.max(35, Math.min(height - 35, pos[n].y));
     });
   }
-  return pos;
+  // Unreached nodes (orphans, e.g. "voir seulement" without path) → depth 0
+  nodes.forEach(n => {
+    if (!depth.has(n)) depth.set(n, 0);
+  });
+
+  // Group by depth
+  const columns = new Map();
+  nodes.forEach(n => {
+    const d = depth.get(n);
+    if (!columns.has(d)) columns.set(d, []);
+    columns.get(d).push(n);
+  });
+  const depths = [...columns.keys()].sort((a, b) => a - b);
+
+  // Initial sort within each column: by paragraph number (deterministic seed)
+  depths.forEach(d => columns.get(d).sort((a, b) => a - b));
+
+  // Initial positions
+  const pos = {};
+  depths.forEach(d => {
+    columns.get(d).forEach((n, i) => {
+      pos[n] = { x: MARGIN_X + d * COL_W, y: MARGIN_Y + i * ROW_H };
+    });
+  });
+
+  // Barycenter refinement: alternate forward/backward sweeps, reorder each column
+  // by avg y of incoming (forward) or outgoing (backward) neighbours.
+  for (let sweep = 0; sweep < 5; sweep++) {
+    for (const d of depths) {
+      if (d === depths[0]) continue;
+      const col = columns.get(d);
+      col.sort((a, b) => {
+        const parA = inAdj.get(a) || [];
+        const parB = inAdj.get(b) || [];
+        const yA = parA.length
+          ? parA.reduce((s, p) => s + (pos[p]?.y ?? 0), 0) / parA.length
+          : pos[a].y;
+        const yB = parB.length
+          ? parB.reduce((s, p) => s + (pos[p]?.y ?? 0), 0) / parB.length
+          : pos[b].y;
+        return yA - yB || a - b; // tie-break by §number for stability
+      });
+      col.forEach((n, i) => { pos[n].y = MARGIN_Y + i * ROW_H; });
+    }
+    for (let i = depths.length - 1; i >= 0; i--) {
+      const d = depths[i];
+      if (d === depths[depths.length - 1]) continue;
+      const col = columns.get(d);
+      col.sort((a, b) => {
+        const chA = outAdj.get(a) || [];
+        const chB = outAdj.get(b) || [];
+        const yA = chA.length
+          ? chA.reduce((s, c) => s + (pos[c]?.y ?? 0), 0) / chA.length
+          : pos[a].y;
+        const yB = chB.length
+          ? chB.reduce((s, c) => s + (pos[c]?.y ?? 0), 0) / chB.length
+          : pos[b].y;
+        return yA - yB || a - b;
+      });
+      col.forEach((n, idx) => { pos[n].y = MARGIN_Y + idx * ROW_H; });
+    }
+  }
+
+  // Apply locked positions (user manual pinning) — overrides computed pos.
+  // Keys come from Object.keys → strings; nodes are numbers, JS coerces same key.
+  Object.entries(locked).forEach(([k, p]) => {
+    const num = Number(k);
+    if (pos[num]) pos[num] = { x: p.x, y: p.y };
+  });
+
+  // Compute SVG dimensions to fit everything
+  let maxX = 0, maxY = 0;
+  Object.values(pos).forEach(p => {
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  });
+  const width = Math.max(MIN_W, maxX + MARGIN_X);
+  const height = Math.max(MIN_H, maxY + MARGIN_Y);
+
+  return { pos, width, height, depth };
 }
 
-// Cache positions to avoid re-shuffling on every render
-let layoutCache = { key: '', positions: {} };
+// Cache positions to avoid recomputing on every render
+let layoutCache = { key: '', layout: null };
 
 function getLocked() {
   return state.game?.mapLockedPositions || {};
@@ -119,15 +169,17 @@ function getLocked() {
 
 function getOrComputeLayout(nodes, edges) {
   const locked = getLocked();
-  const lockedKey = Object.keys(locked).sort().map(k => `${k}:${Math.round(locked[k].x)},${Math.round(locked[k].y)}`).join(';');
+  const lockedKey = Object.keys(locked).sort()
+    .map(k => `${k}:${Math.round(locked[k].x)},${Math.round(locked[k].y)}`)
+    .join(';');
   const key = nodes.slice().sort((a, b) => a - b).join(',') + '|' + edges.length + '|' + lockedKey;
-  if (layoutCache.key === key) return layoutCache.positions;
-  layoutCache = { key, positions: computeLayout(nodes, edges, VIEW_W, VIEW_H, 250, locked) };
-  return layoutCache.positions;
+  if (layoutCache.key === key && layoutCache.layout) return layoutCache.layout;
+  layoutCache = { key, layout: computeHierarchicalLayout(nodes, edges, locked) };
+  return layoutCache.layout;
 }
 
 export function invalidateMapLayout() {
-  layoutCache = { key: '', positions: {} };
+  layoutCache = { key: '', layout: null };
 }
 
 export function unlockAllNodes() {
@@ -149,11 +201,23 @@ export function renderMap() {
     return;
   }
 
-  const positions = getOrComputeLayout(nodes, edges);
+  const { pos: positions, width, height, depth } = getOrComputeLayout(nodes, edges);
+  currentDims = { width, height };
 
+  // Edge classification:
+  //   - forward (col A → col B with B > A) : straight line, brown
+  //   - backward / horizontal (B <= A)     : curved path going up, red dashed
   const edgesSvg = edges.map(({ a, b }) => {
     const pa = positions[a], pb = positions[b];
     if (!pa || !pb) return '';
+    const da = depth.get(a) ?? 0;
+    const db = depth.get(b) ?? 0;
+    if (db <= da) {
+      const midX = (pa.x + pb.x) / 2;
+      const arcHeight = Math.max(35, Math.abs(pb.y - pa.y) * 0.45 + 30);
+      const ctrlY = Math.min(pa.y, pb.y) - arcHeight;
+      return `<path d="M ${pa.x} ${pa.y} Q ${midX} ${ctrlY} ${pb.x} ${pb.y}" fill="none" stroke="#8b1a1a" stroke-width="1.6" marker-end="url(#arrow-back)" opacity="0.7" stroke-dasharray="5 3"/>`;
+    }
     return `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" stroke="#5a3a28" stroke-width="1.6" marker-end="url(#arrow)" opacity="0.55"/>`;
   }).join('');
 
@@ -166,12 +230,11 @@ export function renderMap() {
     const fill = sentiment === 'positive' ? '#27ae60' : sentiment === 'negative' ? '#c0392b' : '#b0a78f';
     const isCurrent = num === game.currentParagraph;
     const isLocked = locked[num] != null;
-    const r = isCurrent ? 22 : 18;
+    const r = isCurrent ? NODE_R_CURRENT : NODE_R_DEFAULT;
     const stroke = isCurrent ? '#d4a017' : '#2c1810';
     const strokeW = isCurrent ? 3 : 2;
     const lockedClass = isLocked ? ' locked' : '';
     const titleAttr = `§${num}${meta.note ? ' — ' + escapeHtml(meta.note) : ''}${isLocked ? ' [position épinglée]' : ''}`;
-    // Tiny pin marker for locked nodes
     const pinMarker = isLocked
       ? `<circle r="4" cx="${r - 3}" cy="${-r + 3}" fill="#d4a017" stroke="#2c1810" stroke-width="1"/>`
       : '';
@@ -183,10 +246,13 @@ export function renderMap() {
     </g>`;
   }).join('');
 
-  container.innerHTML = `<svg class="map-svg" viewBox="0 0 ${VIEW_W} ${VIEW_H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+  container.innerHTML = `<svg class="map-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <marker id="arrow" viewBox="0 -3 10 6" refX="22" refY="0" markerWidth="6" markerHeight="6" orient="auto">
         <path d="M 0,-3 L 8,0 L 0,3 Z" fill="#5a3a28"/>
+      </marker>
+      <marker id="arrow-back" viewBox="0 -3 10 6" refX="22" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 0,-3 L 8,0 L 0,3 Z" fill="#8b1a1a"/>
       </marker>
     </defs>
     ${edgesSvg}
@@ -270,13 +336,11 @@ function attachPanZoom(svg) {
     if (pointers.size === 1) {
       dragDistance += moveAmount;
       if (ptr.nodeEl && ptr.nodeX != null) {
-        // Drag this node only
         const svgDelta = clientDeltaToSvg(dx, dy);
         ptr.nodeX += svgDelta.dx;
         ptr.nodeY += svgDelta.dy;
         ptr.nodeEl.setAttribute('transform', `translate(${ptr.nodeX},${ptr.nodeY})`);
       } else {
-        // Pan the viewBox
         panBy(dx, dy);
       }
     } else if (pointers.size === 2) {
@@ -292,7 +356,6 @@ function attachPanZoom(svg) {
   const release = (e) => {
     const ptr = pointers.get(e.pointerId);
     if (ptr && ptr.nodeEl && ptr.moved && ptr.nodeX != null && state.game) {
-      // Persist node's new position and re-render edges
       if (!state.game.mapLockedPositions) state.game.mapLockedPositions = {};
       state.game.mapLockedPositions[ptr.nodeNum] = { x: ptr.nodeX, y: ptr.nodeY };
       invalidateMapLayout();
@@ -305,7 +368,6 @@ function attachPanZoom(svg) {
   svg.addEventListener('pointercancel', release);
   svg.addEventListener('pointerleave', release);
 
-  // Suppress click after a drag (don't accidentally jump to paragraph)
   svg.addEventListener('click', (e) => {
     if (dragDistance > 8) {
       e.preventDefault();
@@ -314,7 +376,6 @@ function attachPanZoom(svg) {
     dragDistance = 0;
   }, true);
 
-  // Desktop wheel zoom
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
     zoomAround(e.clientX, e.clientY, e.deltaY > 0 ? 1.12 : 0.89);
@@ -335,7 +396,7 @@ export function zoomMapBy(factor) {
 
 export function fitMap() {
   const svg = document.querySelector('.map-svg');
-  if (svg) svg.setAttribute('viewBox', `0 0 ${VIEW_W} ${VIEW_H}`);
+  if (svg) svg.setAttribute('viewBox', `0 0 ${currentDims.width} ${currentDims.height}`);
 }
 
 export function relayoutMap() {
