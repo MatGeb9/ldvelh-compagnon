@@ -367,19 +367,34 @@ const actions = {
   // ─── Test de chance (déplacé du menu vers la feuille de personnage) ───
   'roll-luck': () => doTestLuck(),
   // ─── Revenir en arrière : navigation sans suppression d'historique ───
+  // Reconstruit la pile de navigation forward depuis l'historique pour
+  // déterminer où on est et où retourner. Une entrée [null, X] dans l'historique
+  // signifie "pop puis on est au X qui est sur le top après pop".
+  // Tu peux revenir autant de fois que tu veux jusqu'au paragraphe initial (stack.length == 1).
   'go-back': () => {
     if (!state.game || !Array.isArray(state.game.paragraphHistory)) return;
     const history = state.game.paragraphHistory;
-    // dernier non-null, puis l'avant-dernier non-null
-    let lastIdx = history.length - 1;
-    while (lastIdx >= 0 && history[lastIdx] === null) lastIdx--;
-    let prevIdx = lastIdx - 1;
-    while (prevIdx >= 0 && history[prevIdx] === null) prevIdx--;
-    if (prevIdx < 0) {
-      toast("Aucun paragraphe précédent à rejoindre", 'warn', 1500);
+    // Reconstruit la pile forward
+    const stack = [];
+    let i = 0;
+    while (i < history.length) {
+      const e = history[i];
+      if (e === null && i + 1 < history.length) {
+        // [null, X] = back marker → pop (X re-devient le top)
+        stack.pop();
+        i += 2;
+      } else if (e !== null) {
+        stack.push(e);
+        i++;
+      } else {
+        i++;
+      }
+    }
+    if (stack.length <= 1) {
+      toast("Tu es déjà au paragraphe de départ de la run", 'warn', 1800);
       return;
     }
-    const prevNum = history[prevIdx];
+    const prevNum = stack[stack.length - 2];
     // Marqueur null (coupe l'arête sur la carte) + ré-entrée du précédent
     history.push(null);
     history.push(prevNum);

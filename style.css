@@ -449,6 +449,13 @@ input:focus, select:focus, textarea:focus {
     margin-bottom: 1rem;
 }
 
+.quick-rolls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
 .btn-luck {
     flex-shrink: 0;
     font-family: var(--font-title);
@@ -456,12 +463,21 @@ input:focus, select:focus, textarea:focus {
     color: white;
     border: 2px solid var(--gold);
     border-radius: 10px;
-    padding: 0.8rem 0.7rem;
+    padding: 0.7rem 0.7rem;
     cursor: pointer;
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     min-width: 110px;
     line-height: 1.15;
     transition: background 0.15s, transform 0.12s;
+}
+
+.btn-roll-2d6 {
+    background: var(--blue-light);
+    border-color: var(--blue);
+}
+
+.btn-roll-2d6:hover:not(:disabled) {
+    background: var(--blue);
 }
 
 .btn-luck:hover:not(:disabled) {
