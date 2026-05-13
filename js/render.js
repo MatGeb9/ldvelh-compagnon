@@ -626,16 +626,20 @@ export function renderParagraphs() {
   }
 
   const filter = (state.paragraphFilter || '').toLowerCase().trim();
-  // Count run boundaries to label them
+  // 'RUN' = vraie nouvelle run (affiche séparateur). null = back marker (silencieux).
   let runNumber = 1;
   history.forEach((num, i) => {
-    if (num === null) {
+    if (num === 'RUN') {
       runNumber++;
-      if (filter) return; // hide separators when filtering
+      if (filter) return;
       const sep = document.createElement('div');
       sep.className = 'para-run-separator';
       sep.innerHTML = html`<span>── Run ${runNumber} ──</span>`;
       container.appendChild(sep);
+      return;
+    }
+    if (num === null) {
+      // Back marker — masqué pour ne pas polluer la liste
       return;
     }
     const meta = paragraphs[num] || { sentiment: 'neutral', note: '' };

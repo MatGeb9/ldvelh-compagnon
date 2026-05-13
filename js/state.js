@@ -174,7 +174,8 @@ export function startNewRun(game, { reroll = false } = {}) {
   game.currentParagraph = 1;
   if (!Array.isArray(game.paragraphHistory)) game.paragraphHistory = [];
   if (game.paragraphHistory.length > 0) {
-    game.paragraphHistory.push(null);
+    // 'RUN' = boundary de vraie nouvelle run (distinct des marqueurs null des go-back)
+    game.paragraphHistory.push('RUN');
   }
   game.paragraphHistory.push(1);
   if (!game.paragraphs) game.paragraphs = {};

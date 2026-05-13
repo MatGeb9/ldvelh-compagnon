@@ -163,6 +163,7 @@ const actions = {
     if (!state.game.paragraphs[num]) {
       state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
     }
+    render.renderCurrentParaDetail();
     render.renderParagraphs();
     render.renderParagraphMemory();
     renderMap();
@@ -374,16 +375,22 @@ const actions = {
   'go-back': () => {
     if (!state.game || !Array.isArray(state.game.paragraphHistory)) return;
     const history = state.game.paragraphHistory;
-    // Reconstruit la pile forward
+    // Reconstruit la pile forward dans la RUN COURANTE :
+    //  - 'RUN' (+ premier §) = reset stack (on entre dans une nouvelle run)
+    //  - [null, X] = back marker → pop (X redevient top)
+    //  - num normal = push
     const stack = [];
     let i = 0;
     while (i < history.length) {
       const e = history[i];
-      if (e === null && i + 1 < history.length) {
-        // [null, X] = back marker → pop (X re-devient le top)
+      if (e === 'RUN' && i + 1 < history.length) {
+        stack.length = 0;
+        stack.push(history[i + 1]);
+        i += 2;
+      } else if (e === null && i + 1 < history.length) {
         stack.pop();
         i += 2;
-      } else if (e !== null) {
+      } else if (e !== null && e !== 'RUN') {
         stack.push(e);
         i++;
       } else {
@@ -417,17 +424,18 @@ const actions = {
       return;
     }
     const removed = history.pop();
-    // Skip null markers (run boundaries) — they shouldn't be removable
-    if (removed === null) {
-      history.push(null); // put it back
+    // Skip markers (run / back) — they shouldn't be removable
+    if (removed === null || removed === 'RUN') {
+      history.push(removed); // put it back
       toast("Pas de visite à annuler dans cette run", 'warn', 1500);
       return;
     }
-    // Update currentParagraph to previous non-null entry
+    // Update currentParagraph to previous non-marker entry
     let i = history.length - 1;
-    while (i >= 0 && history[i] === null) i--;
+    while (i >= 0 && (history[i] === null || history[i] === 'RUN')) i--;
     state.game.currentParagraph = i >= 0 ? history[i] : 1;
     el('current-para').value = state.game.currentParagraph;
+    render.renderCurrentParaDetail();
     render.renderParagraphs();
     render.renderParagraphMemory();
     renderMap();
@@ -973,11 +981,18 @@ function loadGame(idx) {
     || [];
   state.game.statDefs = statDefs;
   state.game.adventureConfig = advType ? { ...advType, stats: statDefs } : { stats: statDefs };
+  // Migration: avant le tag 'RUN' (v21-), les "Nouvelle run" poussaient null,
+  // identique aux marqueurs go-back. Comme go-back a été ajouté très récemment,
+  // les nulls dans les vieux saves sont essentiellement des boundaries de run.
+  // On les convertit en 'RUN' pour préserver l'affichage des séparateurs runs.
+  if (Array.isArray(state.game.paragraphHistory)) {
+    state.game.paragraphHistory = state.game.paragraphHistory.map(e => e === null ? 'RUN' : e);
+  }
   // Migration: old saves only had paragraphHistory (flat array). Build paragraphs map.
   if (!state.game.paragraphs) {
     state.game.paragraphs = {};
     (state.game.paragraphHistory || []).forEach(num => {
-      if (num != null && !state.game.paragraphs[num]) {
+      if (num != null && num !== 'RUN' && !state.game.paragraphs[num]) {
         state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
       }
     });

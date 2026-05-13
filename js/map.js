@@ -25,17 +25,18 @@ function buildGraph(game) {
   Object.keys(game.paragraphs || {}).forEach(n => nodeSet.add(Number(n)));
 
   const history = game.paragraphHistory || [];
+  const isBreak = (v) => v === null || v === 'RUN';
   for (let i = 1; i < history.length; i++) {
     const a = history[i - 1];
     const b = history[i];
-    if (a === null || b === null) continue; // run boundary — no edge across runs
+    if (isBreak(a) || isBreak(b)) continue; // pas d'arête à travers un marqueur (run boundary OU go-back)
     if (a === b) continue;
     nodeSet.add(a);
     nodeSet.add(b);
     const key = `${a}->${b}`;
     if (!edgeMap.has(key)) edgeMap.set(key, { a, b });
   }
-  history.forEach(n => { if (n !== null) nodeSet.add(n); });
+  history.forEach(n => { if (!isBreak(n)) nodeSet.add(n); });
 
   return { nodes: [...nodeSet], edges: [...edgeMap.values()] };
 }
@@ -58,9 +59,9 @@ function computeHierarchicalLayout(nodes, edges, locked = {}) {
     inAdj.get(b)?.push(a);
   });
 
-  // Pick the start node: first non-null entry in paragraphHistory, fallback to §1, else first node.
+  // Pick the start node: first non-marker entry in paragraphHistory, fallback to §1, else first node.
   const history = state.game?.paragraphHistory || [];
-  const firstVisit = history.find(n => n != null);
+  const firstVisit = history.find(n => n != null && n !== 'RUN');
   let start = nodes[0];
   if (firstVisit != null && nodes.includes(firstVisit)) start = firstVisit;
   else if (nodes.includes(1)) start = 1;
