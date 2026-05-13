@@ -234,6 +234,7 @@ export function renderGameScreen() {
   renderDiceLog();
   renderParagraphDetailsStatSelect();
   renderParagraphMemory();
+  renderCurrentParaDetail();
   el('current-para').value = game.currentParagraph;
   el('game-notes').value = game.notes || '';
   el('gold-amount').value = game.gold;
@@ -253,11 +254,42 @@ export function renderParagraphDetailsStatSelect() {
     .join('');
 }
 
+// Sync the "Détail de ce paragraphe" section (sentiment buttons + note input + num) with state.game.currentParagraph
+export function renderCurrentParaDetail() {
+  const game = state.game;
+  if (!game) return;
+  const cur = game.currentParagraph;
+  const numSpan = el('detail-para-num');
+  if (numSpan) numSpan.textContent = cur;
+  if (!game.paragraphs) game.paragraphs = {};
+  if (!game.paragraphs[cur]) game.paragraphs[cur] = { sentiment: 'neutral', note: '', events: [] };
+  const meta = game.paragraphs[cur];
+  const sentiment = meta.sentiment || 'neutral';
+  // Update sentiment buttons active state
+  document.querySelectorAll('#current-sentiment-picker .sentiment-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.value === sentiment);
+  });
+  // Update note input
+  const noteInp = el('current-para-note');
+  if (noteInp && noteInp.value !== (meta.note || '')) {
+    noteInp.value = meta.note || '';
+  }
+}
+
 export function renderStats() {
   const game = state.game;
   const panel = el('game-stats-panel');
   panel.innerHTML = '';
   const config = resolveConfig(game);
+  // Activer/désactiver le bouton "Tenter sa Chance" selon présence d'une stat Chance
+  const luckBtn = el('btn-roll-luck');
+  if (luckBtn) {
+    const hasLuck = config.stats.some(s => s.name.toLowerCase().includes('chance'));
+    luckBtn.disabled = !hasLuck;
+    luckBtn.title = hasLuck
+      ? 'Tenter sa Chance (2D6 ≤ Chance courante — Chance baisse de 1 après chaque tentative)'
+      : "Cette aventure n'a pas de caractéristique Chance";
+  }
   config.stats.forEach(statDef => {
     const current = game.stats[statDef.key];
     const max = game.statsMax[statDef.key];

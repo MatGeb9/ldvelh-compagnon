@@ -442,6 +442,43 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ---- Stats Panel ---- */
+.stats-row {
+    display: flex;
+    gap: 0.8rem;
+    align-items: stretch;
+    margin-bottom: 1rem;
+}
+
+.btn-luck {
+    flex-shrink: 0;
+    font-family: var(--font-title);
+    background: var(--gold-dark);
+    color: white;
+    border: 2px solid var(--gold);
+    border-radius: 10px;
+    padding: 0.8rem 0.7rem;
+    cursor: pointer;
+    font-size: 0.92rem;
+    min-width: 110px;
+    line-height: 1.15;
+    transition: background 0.15s, transform 0.12s;
+}
+
+.btn-luck:hover:not(:disabled) {
+    background: var(--gold);
+    transform: translateY(-1px);
+}
+
+.btn-luck:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.stats-row .stats-panel {
+    flex: 1;
+    margin-bottom: 0;
+}
+
 .stats-panel {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1735,6 +1772,13 @@ textarea {
     color: var(--ink-light);
     font-style: italic;
     margin-left: 0.4rem;
+}
+
+.para-details > summary .detail-num {
+    margin-left: 0.4rem;
+    color: var(--red);
+    font-family: var(--font-title);
+    font-size: 1rem;
 }
 
 .para-details[open] > summary {

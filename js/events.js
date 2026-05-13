@@ -22,7 +22,7 @@ const NO_AUTOSAVE_ACTIONS = new Set([
   'add-starting-potion', 'remove-starting-potion',
   'add-starting-object', 'remove-starting-object',
   // Pure UI / view state
-  'tab', 'para-history', 'filter-paragraphs', 'pick-sentiment', 'reset-para-input',
+  'tab', 'para-history', 'filter-paragraphs', 'reset-para-input',
   'map-zoom-in', 'map-zoom-out', 'map-fit', 'map-relayout',
   'menu', 'menu-close', 'menu-quit', 'dice-close',
   // Already triggers an explicit save (loud)
@@ -310,97 +310,90 @@ const actions = {
   'para-history': () => render.switchTab('tab-notes'),
 
   // ─── Ajout de paragraphe (formulaire en onglet Personnage) ───
-  'pick-sentiment': (target) => {
-    state.pendingSentiment = target.dataset.value;
-    document.querySelectorAll('.sentiment-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.value === state.pendingSentiment);
-    });
-  },
   'add-paragraph': () => {
     if (!state.game) return;
     const numInp = el('new-para-num');
-    const noteInp = el('new-para-note');
     const num = parseInt(numInp.value);
     if (!Number.isFinite(num) || num <= 0) {
       numInp.focus();
       return;
     }
-    const sentiment = state.pendingSentiment;
-    const note = noteInp.value.trim();
 
     if (!state.game.paragraphs) state.game.paragraphs = {};
     if (!state.game.paragraphs[num]) {
       state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
     }
-    // Apply sentiment only if user explicitly picked something other than neutral
-    if (sentiment && sentiment !== 'neutral') {
-      state.game.paragraphs[num].sentiment = sentiment;
-    }
-    // Apply note only if non-empty (don't blank out existing note on revisit)
-    if (note) state.game.paragraphs[num].note = note;
 
     state.game.currentParagraph = num;
     if (!Array.isArray(state.game.paragraphHistory)) state.game.paragraphHistory = [];
     state.game.paragraphHistory.push(num);
 
-    // Reset form
+    // Reset form (juste le numéro maintenant — sentiment/note sont sur le § courant via la section Détail)
     numInp.value = '';
-    noteInp.value = '';
-    state.pendingSentiment = 'neutral';
-    document.querySelectorAll('.sentiment-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.value === 'neutral');
-    });
 
     // Update displays
     el('current-para').value = num;
+    render.renderCurrentParaDetail();
     render.renderParagraphs();
     render.renderParagraphMemory();
     renderMap(); // refresh map even if tab not visible — keeps it in sync
-    requestAutoSave();
 
     // Return focus to number input for fast sequential entry
     numInp.focus();
   },
   'reset-para-input': () => {
     el('new-para-num').value = '';
-    el('new-para-note').value = '';
-    state.pendingSentiment = 'neutral';
-    document.querySelectorAll('.sentiment-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.value === 'neutral');
-    });
     el('new-para-num').focus();
   },
-  'see-only-paragraph': () => {
+  // ─── Sentiment + note pour le paragraphe COURANT (section "Détail de ce paragraphe") ───
+  'set-current-sentiment': (target) => {
     if (!state.game) return;
-    const numInp = el('new-para-num');
-    const noteInp = el('new-para-note');
-    const num = parseInt(numInp.value);
-    if (!Number.isFinite(num) || num <= 0) {
-      numInp.focus();
+    const cur = state.game.currentParagraph;
+    if (!state.game.paragraphs) state.game.paragraphs = {};
+    if (!state.game.paragraphs[cur]) state.game.paragraphs[cur] = { sentiment: 'neutral', note: '', events: [] };
+    state.game.paragraphs[cur].sentiment = target.dataset.value;
+    render.renderCurrentParaDetail();
+    render.renderParagraphs();
+    renderMap();
+  },
+  'set-current-note': (target) => {
+    if (!state.game) return;
+    const cur = state.game.currentParagraph;
+    if (!state.game.paragraphs) state.game.paragraphs = {};
+    if (!state.game.paragraphs[cur]) state.game.paragraphs[cur] = { sentiment: 'neutral', note: '', events: [] };
+    state.game.paragraphs[cur].note = target.value;
+    // Pas de re-render Notes/Map ici pour ne pas perdre le focus pendant la frappe ; déclenché ailleurs.
+  },
+  // ─── Test de chance (déplacé du menu vers la feuille de personnage) ───
+  'roll-luck': () => doTestLuck(),
+  // ─── Revenir en arrière : navigation sans suppression d'historique ───
+  'go-back': () => {
+    if (!state.game || !Array.isArray(state.game.paragraphHistory)) return;
+    const history = state.game.paragraphHistory;
+    // dernier non-null, puis l'avant-dernier non-null
+    let lastIdx = history.length - 1;
+    while (lastIdx >= 0 && history[lastIdx] === null) lastIdx--;
+    let prevIdx = lastIdx - 1;
+    while (prevIdx >= 0 && history[prevIdx] === null) prevIdx--;
+    if (prevIdx < 0) {
+      toast("Aucun paragraphe précédent à rejoindre", 'warn', 1500);
       return;
     }
-    const sentiment = state.pendingSentiment;
-    const note = noteInp.value.trim();
-    if (!state.game.paragraphs) state.game.paragraphs = {};
-    const isNew = !state.game.paragraphs[num];
-    if (isNew) state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
-    if (sentiment && sentiment !== 'neutral') state.game.paragraphs[num].sentiment = sentiment;
-    if (note) state.game.paragraphs[num].note = note;
-    // No paragraphHistory.push → pas de visite, pas d'arête sur la carte
-    // Reset form
-    numInp.value = '';
-    noteInp.value = '';
-    state.pendingSentiment = 'neutral';
-    document.querySelectorAll('.sentiment-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.value === 'neutral');
-    });
+    const prevNum = history[prevIdx];
+    // Marqueur null (coupe l'arête sur la carte) + ré-entrée du précédent
+    history.push(null);
+    history.push(prevNum);
+    state.game.currentParagraph = prevNum;
+    el('current-para').value = prevNum;
+    render.renderCurrentParaDetail();
     render.renderParagraphs();
     render.renderParagraphMemory();
     renderMap();
-    requestAutoSave();
-    numInp.focus();
-    toast(`§${num} ajouté à la carte (sans visite)`, 'info', 1800);
+    toast(`Retour au §${prevNum}`, 'info', 1500);
   },
+  // No-op : "Voir seulement" a été retiré (remplacé par "Revenir en arrière").
+  // Stub gardé pour ne pas crasher si un vieil HTML caché contient encore le bouton.
+  'see-only-paragraph': () => {},
   'undo-paragraph': () => {
     if (!state.game || !Array.isArray(state.game.paragraphHistory)) return;
     const history = state.game.paragraphHistory;

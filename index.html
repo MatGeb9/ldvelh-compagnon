@@ -128,7 +128,10 @@
 
         <!-- TAB: Personnage / Stats -->
         <div id="tab-stats" class="tab-content active">
-            <div class="stats-panel" id="game-stats-panel"></div>
+            <div class="stats-row">
+                <button class="btn btn-luck" id="btn-roll-luck" data-action="roll-luck" title="Tenter sa Chance (2D6 ≤ Chance courante)">&#127808; Tenter sa Chance</button>
+                <div class="stats-panel" id="game-stats-panel"></div>
+            </div>
 
             <!-- Section spéciale (Métamorphose, Magie, etc.) -->
             <div id="special-section" class="special-section hidden"></div>
@@ -148,25 +151,33 @@
                     <div class="para-add-row">
                         <label for="new-para-num">Aller au §</label>
                         <input type="number" id="new-para-num" min="1" placeholder="N°" inputmode="numeric">
-                        <div class="sentiment-picker" role="radiogroup" aria-label="Sentiment">
-                            <button type="button" class="sentiment-btn neutral active" data-action="pick-sentiment" data-value="neutral" title="Neutre" aria-label="Neutre"></button>
-                            <button type="button" class="sentiment-btn positive" data-action="pick-sentiment" data-value="positive" title="Positif / bénéfique" aria-label="Positif"></button>
-                            <button type="button" class="sentiment-btn negative" data-action="pick-sentiment" data-value="negative" title="Piège / négatif" aria-label="Négatif"></button>
-                        </div>
                     </div>
-                    <input type="text" id="new-para-note" placeholder="Note (clé d'argent, piège, +2 END, …) — optionnel">
                     <div class="para-add-actions">
                         <button class="btn btn-primary" data-action="add-paragraph">+ Ajouter</button>
-                        <button class="btn btn-secondary" data-action="see-only-paragraph" title="Ajoute le nœud sur la carte sans le compter comme visite">+ Voir seulement</button>
-                        <button class="btn" data-action="undo-paragraph" title="Annule la dernière visite">&#x21B6; Undo</button>
+                        <button class="btn btn-secondary" data-action="go-back" title="Revenir au paragraphe précédent (garde tout l'historique pour explorer une autre voie)">&#x2BAA; Revenir en arrière</button>
+                        <button class="btn" data-action="undo-paragraph" title="Corriger une erreur de saisie : retire la dernière entrée de l'historique">&#x21B6; Undo</button>
                         <button class="btn btn-back" data-action="reset-para-input">Reset</button>
                     </div>
 
-                    <!-- Détails du paragraphe courant : ennemi, objet, or, prov, stat, mort -->
-                    <!-- Toute action ici applique le changement ET log un event sur le § courant pour les futures runs. -->
-                    <details class="para-details">
-                        <summary>Détails de ce paragraphe <span class="hint">(ennemi, objet, stats, mort…)</span></summary>
+                    <!-- Détails du paragraphe courant : sentiment, note, ennemi, objet, or, prov, stat, mort -->
+                    <!-- Toute action ici s'applique sur le § courant (state.game.currentParagraph). -->
+                    <details class="para-details" open>
+                        <summary>Détail de ce paragraphe <span class="detail-num">§<span id="detail-para-num">1</span></span></summary>
                         <div class="para-details-grid">
+                            <div class="para-detail-row">
+                                <span class="para-detail-label">Sentiment</span>
+                                <div class="sentiment-picker" id="current-sentiment-picker" role="radiogroup" aria-label="Sentiment du paragraphe courant">
+                                    <button type="button" class="sentiment-btn neutral active" data-action="set-current-sentiment" data-value="neutral" title="Neutre"></button>
+                                    <button type="button" class="sentiment-btn positive" data-action="set-current-sentiment" data-value="positive" title="Bon / bénéfique"></button>
+                                    <button type="button" class="sentiment-btn negative" data-action="set-current-sentiment" data-value="negative" title="Mauvais / piège"></button>
+                                </div>
+                            </div>
+
+                            <div class="para-detail-row">
+                                <span class="para-detail-label">&#128221; Note</span>
+                                <input type="text" id="current-para-note" data-action="set-current-note" placeholder="Note (clé d'argent, piège, +2 END…)" class="input-md" style="flex:1;">
+                            </div>
+
                             <div class="para-detail-row">
                                 <span class="para-detail-label">&#9876; Ennemi</span>
                                 <input type="text" id="para-enemy-name" placeholder="Nom" class="input-md">
@@ -359,7 +370,6 @@
                 <h3>Menu</h3>
                 <button class="btn btn-full" data-action="menu-save">&#128190; Sauvegarder</button>
                 <button class="btn btn-full" data-action="menu-dice">&#127922; Lancer les Dés</button>
-                <button class="btn btn-full" data-action="menu-test-luck">&#127808; Tenter sa Chance</button>
                 <button class="btn btn-full btn-secondary" data-action="new-run">&#x21BB; Nouvelle run</button>
                 <button class="btn btn-full btn-danger" data-action="menu-quit">&#128682; Quitter l'Aventure</button>
                 <button class="btn btn-full btn-back" data-action="menu-close">Fermer</button>
