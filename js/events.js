@@ -618,6 +618,117 @@ const actions = {
     toast(`💀 Mort loggée au §${cur}`, 'warn', 2500);
     requestAutoSave();
   },
+  'add-para-note': () => {
+    if (!state.game) return;
+    const inp = el('para-note-text');
+    const text = inp.value.trim();
+    if (!text) { inp.focus(); return; }
+    const cur = state.game.currentParagraph;
+    logParagraphEvent(cur, 'note', { text });
+    appendGlobalNote(`§${cur} : ${text}`);
+    inp.value = '';
+    render.renderParagraphMemory();
+    render.renderParagraphs();
+    toast(`📝 Note loggée + ajoutée aux Notes §${cur}`, 'success', 2000);
+    requestAutoSave();
+  },
+  // Re-applique un event loggé sur l'état courant : reproduit l'EFFET uniquement.
+  // enemy → combat · item → inventaire · gold/prov → ajustement · stat → delta · note → Notes globales.
+  // NE LOG PAS de nouvel event — seul le form "Détails du paragraphe" enregistre la mémoire.
+  'reapply-event': async (target) => {
+    if (!state.game) return;
+    const cur = state.game.currentParagraph;
+    const idx = parseInt(target.dataset.evtIdx);
+    const events = state.game.paragraphs?.[cur]?.events || [];
+    const ev = events[idx];
+    if (!ev) return;
+    const game = state.game;
+
+    switch (ev.type) {
+      case 'enemy': {
+        const { name, skill, stamina } = ev.data;
+        game.adversaries.push({
+          name, skill, skillMax: skill, stamina, staminaMax: stamina, defeated: false,
+        });
+        render.renderAdversaries();
+        render.updateCombatButtons();
+        toast(`⚔️ ${name} ré-ajouté en combat`, 'success', 1800);
+        break;
+      }
+      case 'item': {
+        const { name, desc } = ev.data;
+        if (!game.objects) game.objects = [];
+        game.objects.push({ name, desc: desc || '' });
+        render.renderObjects();
+        toast(`🎒 ${name} ré-ajouté à l'inventaire`, 'success', 1800);
+        break;
+      }
+      case 'gold': {
+        const delta = ev.data.delta;
+        game.gold = Math.max(0, (game.gold || 0) + delta);
+        el('gold-amount').value = game.gold;
+        toast(`💰 ${delta > 0 ? '+' : ''}${delta} Or`, delta < 0 ? 'warn' : 'success', 1800);
+        break;
+      }
+      case 'prov': {
+        const delta = ev.data.delta;
+        game.provisions = Math.max(0, (game.provisions || 0) + delta);
+        el('provisions-amount').value = game.provisions;
+        toast(`🍞 ${delta > 0 ? '+' : ''}${delta} Provisions`, delta < 0 ? 'warn' : 'success', 1800);
+        break;
+      }
+      case 'stat': {
+        const key = ev.data.key;
+        const delta = ev.data.delta;
+        const config = resolveConfig(game);
+        const statDef = config.stats.find(s => s.key === key);
+        const statName = statDef?.name || ev.data.name || key;
+        if (!(key in game.stats)) {
+          toast(`Carac "${statName}" absente de ce perso — non appliqué`, 'warn', 2500);
+          return;
+        }
+        const current = game.stats[key];
+        const max = game.statsMax[key];
+        let permanentBonus = false;
+        if (delta > 0 && current + delta > max) {
+          const choice = await modal.choice(
+            `${statName} : ${current} + ${delta} = ${current + delta} dépasserait le maximum (${max}).\n\n` +
+            `Plafonner à ${max} = simple soin\n` +
+            `Bonus permanent = augmente aussi le max (objet magique)`,
+            [
+              { label: 'Annuler', value: null, class: 'btn-back' },
+              { label: `Plafonner à ${max}`, value: 'cap', class: 'btn-secondary' },
+              { label: `Bonus permanent (+${current + delta - max})`, value: 'boost', class: 'btn-primary' },
+            ],
+            `Dépasser le maximum ?`
+          );
+          if (!choice) return;
+          if (choice === 'boost') {
+            game.statsMax[key] = current + delta;
+            game.stats[key] = current + delta;
+            permanentBonus = true;
+          } else {
+            game.stats[key] = max;
+          }
+        } else {
+          const wasDeath = adjustStat(key, delta);
+          if (wasDeath) modal.alert("Votre héros est mort ! Son endurance est tombée à 0.", 'Mort');
+        }
+        render.renderStats();
+        toast(`${statName} : ${delta > 0 ? '+' : ''}${delta}${permanentBonus ? ' (perm)' : ''}`, delta < 0 ? 'warn' : 'success', 1800);
+        break;
+      }
+      case 'note': {
+        const text = ev.data.text || '';
+        appendGlobalNote(`§${cur} : ${text}`);
+        toast(`📝 Note ré-ajoutée aux Notes`, 'success', 1800);
+        break;
+      }
+      default:
+        return; // 'death' et types inconnus : rien à ré-appliquer
+    }
+    requestAutoSave();
+  },
 
   // Combat
   'add-adversary': () => addAdversaryFromInputs(),
@@ -927,6 +1038,16 @@ function addObjectFromInputs() {
   nameInput.value = '';
   descInput.value = '';
   render.renderObjects();
+}
+
+// Append a line to the game's free-form notes (Notes tab textarea) and sync the DOM.
+// Used by the paragraph "+ Note" action so notes behave like objects: logged AND propagated.
+function appendGlobalNote(line) {
+  if (!state.game) return;
+  const cur = state.game.notes || '';
+  state.game.notes = cur ? `${cur}\n${line}` : line;
+  const ta = el('game-notes');
+  if (ta) ta.value = state.game.notes;
 }
 
 async function eatMeal() {

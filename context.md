@@ -235,5 +235,24 @@ Le tableau `events` n'est PAS reset par `startNewRun()` (c'est tout l'intérêt)
 
 **Tradeoff connu** : si une colonne contient 20+ § (très forte ramification depuis un même paragraphe), ça scrolle verticalement. C'est attendu — beaucoup plus lisible qu'un nuage emmêlé, mais pas magique pour les graphes très denses.
 
+### 2026-05-14 — Réapplication des events + type d'event `note` (SW v23)
+
+**Pourquoi** : sur un § déjà visité avec des events loggés (runs précédentes), il fallait pouvoir re-déclencher rapidement ce qu'on y avait rencontré au lieu de tout re-saisir à la main dans le form Détails.
+
+**Bouton ↻ Réappliquer** dans le panneau Souvenirs, section "Ici (toutes runs)" :
+- Chaque event ré-appliable (`enemy`, `item`, `gold`, `prov`, `stat`, `note` — voir `REAPPLIABLE` set dans render.js) reçoit un bouton ↻.
+- `death` n'est pas ré-appliable (rien à refaire).
+- Action `reapply-event` (events.js) : reproduit l'EFFET uniquement (ajoute l'ennemi au combat, l'or aux provisions, etc.). **Ne log PAS de nouvel event** — sinon liste mémoire infinie. Seul le form "Détails du paragraphe" enregistre une occurrence en mémoire.
+- `stat` : si la carac n'existe pas sur le perso courant (save d'un autre type d'aventure), skip avec toast warn. Réutilise le dialogue bonus permanent.
+- L'index passé est l'index original dans `paragraphs[cur].events` (pas l'index trié) — `renderParagraphMemory` mappe `(ev, idx)` avant de trier pour l'affichage.
+
+**Nouveau type d'event `note`** :
+- Ligne "📝 Note" ajoutée au form Détails du paragraphe → action `add-para-note`.
+- Comportement "comme un objet" : log un event `note` sur le § courant ET append `§N : texte` aux notes globales (`game.notes` + textarea onglet Notes) via le helper `appendGlobalNote()`.
+- `formatEvent` / `summarizeEvents` / `EVENT_ICON` gèrent le type `note`.
+- Distinct du champ `new-para-note` du form d'ajout, qui reste le label cumulatif du § (affiché sur la carte et l'historique) — non touché.
+
+**Garantie save** : `note` est juste un nouveau type dans `events[]` (déjà migré partout). Aucune clé renommée. Les saves sans events `note` fonctionnent identiquement.
+
 ### Backlog
 - _(à remplir au fil de l'eau)_

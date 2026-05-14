@@ -1720,6 +1720,21 @@ textarea {
     color: var(--ink);
 }
 
+.memory-reapply-btn {
+    flex-shrink: 0;
+    padding: 0.1rem 0.5rem;
+    font-size: 1rem;
+    line-height: 1;
+    background: var(--parchment-light);
+    border-color: var(--gold-dark);
+    color: var(--gold-dark);
+    font-weight: 700;
+}
+.memory-reapply-btn:hover {
+    background: var(--gold);
+    color: var(--ink);
+}
+
 .memory-run-tag {
     font-size: 0.75rem;
     padding: 1px 6px;

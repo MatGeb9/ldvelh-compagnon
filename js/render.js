@@ -498,7 +498,11 @@ const EVENT_ICON = {
   gold: '💰',
   prov: '🍞',
   stat: '±',
+  note: '📝',
 };
+
+// Event types that can be re-applied to the current game state from the memory panel.
+const REAPPLIABLE = new Set(['enemy', 'item', 'gold', 'prov', 'stat', 'note']);
 
 function formatEvent(ev) {
   const tag = `<span class="memory-run-tag">Run ${ev.run}</span>`;
@@ -522,6 +526,8 @@ function formatEvent(ev) {
       const perm = ev.data.permanentBonus ? ' (perm.)' : '';
       return html`<span class="memory-event-text"><strong>${raw(EVENT_ICON.stat)}${sign}${ev.data.delta} ${ev.data.name}${perm}</strong></span>${raw(tag)}`;
     }
+    case 'note':
+      return html`<span class="memory-event-text"><strong>${raw(EVENT_ICON.note)}</strong> ${ev.data.text}</span>${raw(tag)}`;
     default:
       return escapeHtml(JSON.stringify(ev.data));
   }
@@ -558,6 +564,9 @@ function summarizeEvents(events) {
         .join(', ')
     );
   }
+  if (byType.has('note')) {
+    parts.push(`📝 ${byType.get('note').map(e => e.data.text).join(' · ')}`);
+  }
   return parts.join(' · ');
 }
 
@@ -584,10 +593,15 @@ export function renderParagraphMemory() {
 
   if (hereEvents.length > 0) {
     out += `<div class="memory-section"><div class="memory-section-title">Ici (toutes runs)</div>`;
-    // Sort by run then ts (chronological within run)
-    const sorted = [...hereEvents].sort((a, b) => (a.run - b.run) || (a.ts - b.ts));
-    sorted.forEach(ev => {
-      out += `<div class="memory-event memory-event-${ev.type}">${formatEvent(ev)}</div>`;
+    // Keep original index (for reapply-event) while sorting by run then ts for display
+    const sorted = hereEvents
+      .map((ev, idx) => ({ ev, idx }))
+      .sort((a, b) => (a.ev.run - b.ev.run) || (a.ev.ts - b.ev.ts));
+    sorted.forEach(({ ev, idx }) => {
+      const reapply = REAPPLIABLE.has(ev.type)
+        ? `<button class="btn btn-small memory-reapply-btn" data-action="reapply-event" data-evt-idx="${idx}" title="Réappliquer cet event sur la run courante">↻</button>`
+        : '';
+      out += `<div class="memory-event memory-event-${ev.type}">${formatEvent(ev)}${reapply}</div>`;
     });
     out += `</div>`;
   }
