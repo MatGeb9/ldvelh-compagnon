@@ -697,55 +697,6 @@ input:focus, select:focus, textarea:focus {
     justify-content: flex-end;
 }
 
-/* ---- Alertes ---- */
-.alerts-section {
-    margin-top: 1rem;
-}
-.alerts-section h3 {
-    font-family: var(--font-title);
-    margin-bottom: 0.5rem;
-    color: var(--ink);
-    font-size: 1.1rem;
-}
-
-.alerts-list {
-    margin-bottom: 0.5rem;
-}
-
-.alert-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0.6rem;
-    border-radius: 6px;
-    margin-bottom: 0.3rem;
-    font-size: 0.9rem;
-    border-left: 4px solid;
-}
-.alert-item.warning { background: #fff3cd; border-color: var(--warning); }
-.alert-item.info { background: #d1ecf1; border-color: var(--info); }
-.alert-item.danger { background: #f8d7da; border-color: var(--danger); }
-.alert-item.success { background: #d4edda; border-color: var(--success); }
-
-.alert-item .alert-remove {
-    margin-left: auto;
-    cursor: pointer;
-    opacity: 0.6;
-    background: none;
-    border: none;
-    font-size: 1.1rem;
-}
-.alert-item .alert-remove:hover { opacity: 1; }
-
-.alert-add {
-    display: flex;
-    gap: 0.3rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.alert-add input { flex: 1; min-width: 150px; }
-.alert-add select { width: auto; min-width: 100px; }
-
 /* ---- Combat ---- */
 .combat-zone-header {
     display: flex;
@@ -1348,12 +1299,6 @@ textarea {
         font-size: 0.8rem;
         padding: 0.6rem 0.3rem;
     }
-    .alert-add {
-        flex-direction: column;
-    }
-    .alert-add input, .alert-add select {
-        width: 100%;
-    }
 }
 
 /* ---- Scrollbar ---- */
@@ -1501,56 +1446,236 @@ textarea {
 .equipment-grid .add-row .input-md { flex: 1; min-width: 110px; }
 
 /* ---- Mind-map des paragraphes ---- */
-.map-controls {
+.map-header {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
+    gap: 0.3rem 0.8rem;
+    align-items: baseline;
     margin-bottom: 0.7rem;
 }
+
+.map-header h3 { margin: 0; font-size: 1.15rem; }
 
 .map-hint {
     font-size: 0.8rem;
     color: var(--ink-light);
     font-style: italic;
-    margin-left: auto;
 }
 
 .map-canvas {
     width: 100%;
-    height: 65vh;
-    min-height: 380px;
+    min-height: 300px;
+    max-height: 72vh;
+    overflow-y: auto;
     background: var(--parchment-light);
     border: 1px solid var(--border);
     border-radius: 8px;
-    overflow: hidden;
-    position: relative;
+    padding: 0.8rem;
 }
 
-.map-svg {
-    display: block;
-    width: 100%;
-    height: 100%;
-    touch-action: none;
-    user-select: none;
-    cursor: grab;
+/* ---- Verdict badge (partagé contrôle + carte) ---- */
+.zone-verdict {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    border: 1px solid transparent;
 }
+.zone-verdict-utile  { background: rgba(39,174,96,0.16);  color: var(--green-light); border-color: rgba(39,174,96,0.4); }
+.zone-verdict-danger { background: rgba(192,57,43,0.16);  color: var(--red-light);   border-color: rgba(192,57,43,0.4); }
+.zone-verdict-mitige { background: rgba(212,160,23,0.18); color: var(--gold-dark);   border-color: rgba(212,160,23,0.45); }
+.zone-verdict-neutre { background: rgba(90,58,40,0.10);   color: var(--ink-light);   border-color: var(--border); }
 
-.map-svg:active {
-    cursor: grabbing;
+/* ---- Zone control (onglet Personnage) ---- */
+.zone-control:empty { display: none; }
+.zone-control {
+    background: var(--parchment-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.8rem;
 }
+.zone-control-header {
+    font-family: var(--font-title);
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+.zone-active {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    background: rgba(44,24,16,0.05);
+}
+.zone-active.is-on {
+    background: color-mix(in srgb, var(--zone-color) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--zone-color) 55%, transparent);
+}
+.zone-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--zone-color, #9a8f76);
+    border: 1px solid var(--ink);
+    flex-shrink: 0;
+}
+.zone-active-label { font-size: 0.9rem; }
+.zone-active-none { color: var(--ink-light); font-style: italic; }
+.zone-close-btn { margin-left: auto; }
 
-.map-node {
+.zone-create {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.55rem;
+}
+.zone-create .input-md { flex: 1; min-width: 120px; }
+
+.zone-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.zone-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--zone-color) 55%, var(--border));
+    background: color-mix(in srgb, var(--zone-color) 10%, var(--parchment));
+    color: var(--ink);
+    font-size: 0.82rem;
     cursor: pointer;
+    transition: transform 0.08s, box-shadow 0.12s;
+}
+.zone-chip:hover { transform: translateY(-1px); box-shadow: 0 2px 5px var(--shadow); }
+.zone-chip.is-active {
+    border-color: var(--zone-color);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--zone-color) 45%, transparent);
+    font-weight: 700;
+}
+.zone-chip-count { font-size: 0.72rem; color: var(--ink-light); }
+.zone-chip-verdict { font-weight: 700; }
+
+/* ---- Tag de zone sur les lignes d'historique ---- */
+.para-zone-tag {
+    font-size: 0.7rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--zone-color) 18%, var(--parchment));
+    border: 1px solid color-mix(in srgb, var(--zone-color) 50%, var(--border));
+    color: var(--ink);
+    white-space: nowrap;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
 }
 
-.map-node circle {
-    transition: r 0.15s, stroke-width 0.15s;
+/* ---- Carte des zones (onglet Carte) ---- */
+.zone-map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.7rem;
 }
+.zone-map-intro {
+    padding: 1.2rem;
+    text-align: center;
+    color: var(--ink-light);
+    font-style: italic;
+}
+.zone-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.8rem;
+}
+.zone-card {
+    display: flex;
+    background: var(--parchment);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px var(--shadow);
+}
+.zone-card.is-active {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--zone-color) 60%, transparent), 0 1px 3px var(--shadow);
+}
+.zone-card-bar {
+    width: 6px;
+    flex-shrink: 0;
+    background: var(--zone-color, #9a8f76);
+}
+.zone-card-body { flex: 1; padding: 0.6rem 0.7rem; min-width: 0; }
+.zone-card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.35rem;
+}
+.zone-card-name {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-title);
+    font-size: 1.05rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    padding: 0.1rem 0.3rem;
+    color: var(--ink);
+}
+.zone-card-name:focus { border-color: var(--border); background: var(--parchment-light); outline: none; }
+.zone-card-name-static { font-style: italic; color: var(--ink-light); }
+.zone-card-meta {
+    display: flex;
+    gap: 0.6rem;
+    font-size: 0.74rem;
+    color: var(--ink-light);
+    margin-bottom: 0.45rem;
+}
+.zone-card-count { font-weight: 700; }
 
-.map-node:hover circle {
-    stroke: var(--gold);
+.zone-paras { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+.zone-chips-empty { font-size: 0.8rem; color: var(--ink-light); font-style: italic; margin-bottom: 0.5rem; }
+.zone-para {
+    min-width: 32px;
+    padding: 0.15rem 0.4rem;
+    border-radius: 5px;
+    border: 1px solid var(--ink);
+    border-left: 4px solid var(--s, #b0a78f);
+    background: var(--parchment-light);
+    color: var(--ink);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.08s;
 }
+.zone-para:hover { transform: translateY(-1px); }
+.zone-para.is-current {
+    box-shadow: 0 0 0 2px var(--gold);
+    border-color: var(--gold-dark);
+}
+.zone-card-summary {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--ink);
+    background: rgba(44,24,16,0.04);
+    border-radius: 5px;
+    padding: 0.35rem 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.zone-card-summary-empty { color: var(--ink-light); font-style: italic; }
+
+.zone-runs { margin-bottom: 0.5rem; font-size: 0.8rem; }
+.zone-runs summary { cursor: pointer; color: var(--ink-light); }
+.zone-run-block { margin: 0.35rem 0 0; }
+.zone-run-tag { font-weight: 700; font-size: 0.72rem; color: var(--blue-light); }
+.zone-run-line { padding-left: 0.4rem; }
+.zone-run-para { font-weight: 700; }
+
+.zone-card-actions { display: flex; gap: 0.4rem; }
+.zone-card-actions .btn:first-child { flex: 1; }
 
 .map-empty {
     display: flex;

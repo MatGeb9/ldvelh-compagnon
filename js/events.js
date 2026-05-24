@@ -1,11 +1,11 @@
 import { rollDice } from './dice.js';
 import { el, modal, toast } from './dom.js';
-import { state, resolveConfig, resetCharCreate, createGameState, adjustStat, startNewRun, logDice, logParagraphEvent } from './state.js';
+import { state, resolveConfig, resetCharCreate, createGameState, adjustStat, startNewRun, logDice, logParagraphEvent, createZone, getZone, tagParagraphWithActiveZone } from './state.js';
 import { getSaves, persistGame, persistGameSilent, removeSave, exportSaves, importSaves } from './save.js';
 import { getAdventureType } from './adventure-types.js';
 import * as combat from './combat.js';
 import * as render from './render.js';
-import { renderMap, zoomMapBy, fitMap, relayoutMap, unlockAllNodes } from './map.js';
+import { renderMap } from './map.js';
 
 // ───────────────────────────────────────────────
 // Autosave (debounced, silent unless quota fails)
@@ -23,7 +23,6 @@ const NO_AUTOSAVE_ACTIONS = new Set([
   'add-starting-object', 'remove-starting-object',
   // Pure UI / view state
   'tab', 'para-history', 'filter-paragraphs', 'reset-para-input',
-  'map-zoom-in', 'map-zoom-out', 'map-fit', 'map-relayout',
   'menu', 'menu-close', 'menu-quit', 'dice-close',
   // Already triggers an explicit save (loud)
   'save', 'menu-save',
@@ -143,15 +142,6 @@ const actions = {
     if (target.dataset.tab === 'tab-map') renderMap();
   },
 
-  // Map controls
-  'map-zoom-in': () => zoomMapBy(0.85),
-  'map-zoom-out': () => zoomMapBy(1.18),
-  'map-fit': () => fitMap(),
-  'map-relayout': () => relayoutMap(),
-  'map-unlock-all': () => {
-    unlockAllNodes();
-    toast('Toutes les positions libérées', 'info', 1500);
-  },
   'jump-to-paragraph': (target) => {
     if (!state.game) return;
     const num = parseInt(target.dataset.num);
@@ -161,11 +151,13 @@ const actions = {
     state.game.paragraphHistory.push(num);
     if (!state.game.paragraphs) state.game.paragraphs = {};
     if (!state.game.paragraphs[num]) {
-      state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
+      state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [], zone: null };
     }
+    tagParagraphWithActiveZone(state.game, num);
     render.renderCurrentParaDetail();
     render.renderParagraphs();
     render.renderParagraphMemory();
+    render.renderZoneControl();
     renderMap();
     requestAutoSave();
   },
@@ -300,13 +292,6 @@ const actions = {
     render.renderSpecialSection();
   },
 
-  // Alerts
-  'add-alert': () => addAlertFromInput(),
-  'remove-alert': (target) => {
-    state.game.alerts.splice(parseInt(target.dataset.idx), 1);
-    render.renderAlerts();
-  },
-
   // Paragraph history → switch to notes tab
   'para-history': () => render.switchTab('tab-notes'),
 
@@ -322,12 +307,13 @@ const actions = {
 
     if (!state.game.paragraphs) state.game.paragraphs = {};
     if (!state.game.paragraphs[num]) {
-      state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
+      state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [], zone: null };
     }
 
     state.game.currentParagraph = num;
     if (!Array.isArray(state.game.paragraphHistory)) state.game.paragraphHistory = [];
     state.game.paragraphHistory.push(num);
+    tagParagraphWithActiveZone(state.game, num);
 
     // Reset form (juste le numéro maintenant — sentiment/note sont sur le § courant via la section Détail)
     numInp.value = '';
@@ -337,6 +323,7 @@ const actions = {
     render.renderCurrentParaDetail();
     render.renderParagraphs();
     render.renderParagraphMemory();
+    render.renderZoneControl();
     renderMap(); // refresh map even if tab not visible — keeps it in sync
 
     // Return focus to number input for fast sequential entry
@@ -345,6 +332,78 @@ const actions = {
   'reset-para-input': () => {
     el('new-para-num').value = '';
     el('new-para-num').focus();
+  },
+
+  // ─── Zones d'exploration (regroupement de § cross-run) ───
+  // Créer une zone → devient active → tag tout § visité jusqu'à clôture ou nouvelle zone.
+  'create-zone': () => {
+    if (!state.game) return;
+    const inp = el('new-zone-name');
+    const name = (inp?.value || '').trim();
+    const zone = createZone(state.game, name);
+    // Rattache immédiatement le § courant à la nouvelle zone.
+    tagParagraphWithActiveZone(state.game, state.game.currentParagraph);
+    if (inp) inp.value = '';
+    render.renderZoneControl();
+    render.renderParagraphs();
+    renderMap();
+    requestAutoSave();
+    toast(`Zone « ${zone.name} » active — les § visités y seront rattachés`, 'success', 2400);
+  },
+  // Clôturer : on referme le stylo, les § suivants seront "Non classés" jusqu'à réactivation.
+  'close-zone': () => {
+    if (!state.game) return;
+    const z = getZone(state.game, state.game.activeZoneId);
+    state.game.activeZoneId = null;
+    render.renderZoneControl();
+    renderMap();
+    requestAutoSave();
+    toast(z ? `Zone « ${z.name} » clôturée` : 'Zone clôturée', 'info', 1800);
+  },
+  // Réactiver une zone existante (la reprendre comme stylo actif).
+  'activate-zone': (target) => {
+    if (!state.game) return;
+    const id = target.dataset.id;
+    const z = getZone(state.game, id);
+    if (!z) return;
+    state.game.activeZoneId = id;
+    tagParagraphWithActiveZone(state.game, state.game.currentParagraph);
+    render.renderZoneControl();
+    render.renderParagraphs();
+    renderMap();
+    requestAutoSave();
+    toast(`Zone « ${z.name} » reprise`, 'success', 1800);
+  },
+  // Renommer en place (input sur la carte de zone).
+  'rename-zone': (target) => {
+    if (!state.game) return;
+    const z = getZone(state.game, target.dataset.id);
+    if (!z) return;
+    z.name = (target.value || '').trim() || z.name;
+    render.renderZoneControl();
+    requestAutoSave();
+  },
+  // Supprimer une zone : ses § redeviennent "Non classés" (aucune perte de souvenir).
+  'delete-zone': async (target) => {
+    if (!state.game) return;
+    const id = target.dataset.id;
+    const z = getZone(state.game, id);
+    if (!z) return;
+    const ok = await modal.confirm(
+      `Supprimer la zone « ${z.name} » ? Ses paragraphes redeviennent « Non classés » (leurs souvenirs sont conservés).`,
+      'Supprimer la zone'
+    );
+    if (!ok) return;
+    state.game.zones = (state.game.zones || []).filter(x => x.id !== id);
+    Object.values(state.game.paragraphs || {}).forEach(p => {
+      if (p.zone === id) p.zone = null;
+    });
+    if (state.game.activeZoneId === id) state.game.activeZoneId = null;
+    render.renderZoneControl();
+    render.renderParagraphs();
+    renderMap();
+    requestAutoSave();
+    toast(`Zone « ${z.name} » supprimée`, 'info', 1800);
   },
   // ─── Sentiment + note pour le paragraphe COURANT (section "Détail de ce paragraphe") ───
   'set-current-sentiment': (target) => {
@@ -377,8 +436,10 @@ const actions = {
     const history = state.game.paragraphHistory;
     // Reconstruit la pile forward dans la RUN COURANTE :
     //  - 'RUN' (+ premier §) = reset stack (on entre dans une nouvelle run)
-    //  - [null, X] = back marker → pop (X redevient top)
+    //  - ['BACK', X] = back marker → pop (X redevient top)
     //  - num normal = push
+    // (les vieux marqueurs null ont été migrés en 'RUN' au chargement, donc absents ici)
+    const isMarker = (e) => e === 'BACK' || e === 'RUN' || e === null;
     const stack = [];
     let i = 0;
     while (i < history.length) {
@@ -387,10 +448,10 @@ const actions = {
         stack.length = 0;
         stack.push(history[i + 1]);
         i += 2;
-      } else if (e === null && i + 1 < history.length) {
+      } else if (e === 'BACK' && i + 1 < history.length) {
         stack.pop();
         i += 2;
-      } else if (e !== null && e !== 'RUN') {
+      } else if (!isMarker(e)) {
         stack.push(e);
         i++;
       } else {
@@ -402,8 +463,9 @@ const actions = {
       return;
     }
     const prevNum = stack[stack.length - 2];
-    // Marqueur null (coupe l'arête sur la carte) + ré-entrée du précédent
-    history.push(null);
+    // Marqueur 'BACK' (coupe l'arête sur la carte, silencieux dans l'historique)
+    // + ré-entrée du précédent. NB : distinct de null, qui = boundary de run au chargement.
+    history.push('BACK');
     history.push(prevNum);
     state.game.currentParagraph = prevNum;
     el('current-para').value = prevNum;
@@ -425,14 +487,14 @@ const actions = {
     }
     const removed = history.pop();
     // Skip markers (run / back) — they shouldn't be removable
-    if (removed === null || removed === 'RUN') {
+    if (removed === null || removed === 'BACK' || removed === 'RUN') {
       history.push(removed); // put it back
       toast("Pas de visite à annuler dans cette run", 'warn', 1500);
       return;
     }
     // Update currentParagraph to previous non-marker entry
     let i = history.length - 1;
-    while (i >= 0 && (history[i] === null || history[i] === 'RUN')) i--;
+    while (i >= 0 && (history[i] === null || history[i] === 'BACK' || history[i] === 'RUN')) i--;
     state.game.currentParagraph = i >= 0 ? history[i] : 1;
     el('current-para').value = state.game.currentParagraph;
     render.renderCurrentParaDetail();
@@ -999,16 +1061,6 @@ function doTestLuck() {
   render.renderDiceLog();
 }
 
-function addAlertFromInput() {
-  const input = el('alert-input');
-  const type = el('alert-type').value;
-  const text = input.value.trim();
-  if (!text || !state.game) return;
-  state.game.alerts.push({ text, type });
-  input.value = '';
-  render.renderAlerts();
-}
-
 async function addAdversaryFromInputs() {
   const name = el('adv-name').value.trim();
   const skill = parseInt(el('adv-skill').value);
@@ -1102,10 +1154,11 @@ function loadGame(idx) {
     || [];
   state.game.statDefs = statDefs;
   state.game.adventureConfig = advType ? { ...advType, stats: statDefs } : { stats: statDefs };
-  // Migration: avant le tag 'RUN' (v21-), les "Nouvelle run" poussaient null,
-  // identique aux marqueurs go-back. Comme go-back a été ajouté très récemment,
-  // les nulls dans les vieux saves sont essentiellement des boundaries de run.
-  // On les convertit en 'RUN' pour préserver l'affichage des séparateurs runs.
+  // Migration: avant le tag 'RUN' (v21-), les "Nouvelle run" poussaient null.
+  // Depuis v25 le go-back pousse 'BACK' (et non plus null) : un null restant ne
+  // peut donc venir QUE d'une vieille boundary de run → on le convertit en 'RUN'.
+  // (avant v25, le go-back poussait aussi null et cette migration transformait par
+  //  erreur chaque retour arrière en faux séparateur de run au rechargement.)
   if (Array.isArray(state.game.paragraphHistory)) {
     state.game.paragraphHistory = state.game.paragraphHistory.map(e => e === null ? 'RUN' : e);
   }
@@ -1113,7 +1166,7 @@ function loadGame(idx) {
   if (!state.game.paragraphs) {
     state.game.paragraphs = {};
     (state.game.paragraphHistory || []).forEach(num => {
-      if (num != null && num !== 'RUN' && !state.game.paragraphs[num]) {
+      if (typeof num === 'number' && !state.game.paragraphs[num]) {
         state.game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [] };
       }
     });
@@ -1125,6 +1178,13 @@ function loadGame(idx) {
   });
   // Migration: runCount missing on saves created before the field existed → default 1.
   if (!state.game.runCount) state.game.runCount = 1;
+  // Migration: zones (regroupement de § cross-run). Saves d'avant n'en ont pas →
+  // tableau vide + aucune zone active + chaque § "Non classé" (zone: null).
+  if (!Array.isArray(state.game.zones)) state.game.zones = [];
+  if (state.game.activeZoneId === undefined) state.game.activeZoneId = null;
+  Object.values(state.game.paragraphs).forEach(p => {
+    if (p.zone === undefined) p.zone = null;
+  });
   render.showScreen('screen-game');
   render.renderGameScreen();
 }
@@ -1193,9 +1253,6 @@ export function attachEvents() {
     if (!state.game) return;
     state.game.provisions = Math.max(0, parseInt(el('provisions-amount').value) || 0);
     requestAutoSave();
-  });
-  el('alert-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') addAlertFromInput();
   });
   el('object-name').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') addObjectFromInputs();

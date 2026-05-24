@@ -142,6 +142,9 @@
             <!-- Souvenirs des runs précédentes (cross-run memory) -->
             <div id="para-memory-panel" class="para-memory-panel hidden"></div>
 
+            <!-- Zones d'exploration : zone active (stylo) + création + reprise -->
+            <div id="zone-control" class="zone-control"></div>
+
             <!-- Paragraphe actuel + formulaire d'ajout rapide -->
             <div class="current-paragraph">
                 <div class="current-para-header">
@@ -234,22 +237,6 @@
                     <button class="btn btn-small" data-action="clear-dice-log" title="Effacer l'historique des lancers">Effacer</button>
                 </div>
                 <div id="dice-log-list" class="dice-log-list"></div>
-            </div>
-
-            <!-- Alertes / Status -->
-            <div class="alerts-section">
-                <h3>Alertes & Statuts</h3>
-                <div id="alerts-list" class="alerts-list"></div>
-                <div class="alert-add">
-                    <input type="text" id="alert-input" placeholder="Ajouter une alerte ou statut...">
-                    <select id="alert-type">
-                        <option value="warning">&#9888; Alerte</option>
-                        <option value="info">&#8505; Info</option>
-                        <option value="danger">&#9760; Danger</option>
-                        <option value="success">&#10004; Bonus</option>
-                    </select>
-                    <button class="btn btn-small" id="btn-add-alert" data-action="add-alert">+</button>
-                </div>
             </div>
         </div>
 
@@ -360,15 +347,11 @@
             </div>
         </div>
 
-        <!-- TAB: Carte / Mind-map -->
+        <!-- TAB: Carte des Zones -->
         <div id="tab-map" class="tab-content">
-            <div class="map-controls">
-                <button class="btn btn-small" data-action="map-zoom-in" title="Zoom +">+</button>
-                <button class="btn btn-small" data-action="map-zoom-out" title="Zoom −">−</button>
-                <button class="btn btn-small" data-action="map-fit" title="Recadrer">&#8676;</button>
-                <button class="btn btn-small btn-primary" data-action="map-relayout" title="Recalculer le placement">&#x21BB; Re-layout</button>
-                <button class="btn btn-small" data-action="map-unlock-all" title="Libère toutes les positions épinglées">&#128274;&#65039; Tout libérer</button>
-                <span class="map-hint">Glisser fond = pan · glisser nœud = épingle sa position · pincer/molette = zoom · tap nœud = sauter au §</span>
+            <div class="map-header">
+                <h3>&#128506; Carte des Zones</h3>
+                <span class="map-hint">Les zones se créent dans l'onglet Personnage. Tape un § pour y sauter. Le verdict agrège toutes tes runs.</span>
             </div>
             <div id="map-canvas" class="map-canvas"></div>
         </div>

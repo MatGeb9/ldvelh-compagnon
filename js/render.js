@@ -1,6 +1,6 @@
 import { ADVENTURE_TYPES, getAdventureType } from './adventure-types.js';
 import { el, escapeHtml, html, raw } from './dom.js';
-import { state, resolveConfig, getNeighborsFromHistory } from './state.js';
+import { state, resolveConfig, getNeighborsFromHistory, summarizeZone, getZone, VERDICT_META } from './state.js';
 import { getSaves, getLastExportInfo } from './save.js';
 
 // ──────────── Navigation ────────────
@@ -227,13 +227,13 @@ export function renderGameScreen() {
   el('game-book-title').textContent = game.bookTitle || '';
   renderStats();
   renderSpecialSection();
-  renderAlerts();
   renderAdversaries();
   renderInventory();
   renderParagraphs();
   renderDiceLog();
   renderParagraphDetailsStatSelect();
   renderParagraphMemory();
+  renderZoneControl();
   renderCurrentParaDetail();
   el('current-para').value = game.currentParagraph;
   el('game-notes').value = game.notes || '';
@@ -445,22 +445,6 @@ export function renderSpecialSection() {
   }
 }
 
-// ──────────── Alerts ────────────
-
-export function renderAlerts() {
-  const list = el('alerts-list');
-  list.innerHTML = '';
-  (state.game?.alerts || []).forEach((alert, i) => {
-    const item = document.createElement('div');
-    item.className = `alert-item ${alert.type}`;
-    item.innerHTML = html`
-      <span>${alert.text}</span>
-      <button class="alert-remove" data-action="remove-alert" data-idx="${i}">${raw('&#10006;')}</button>
-    `;
-    list.appendChild(item);
-  });
-}
-
 // ──────────── Derniers lancers de dés (Personnage tab) ────────────
 
 export function renderDiceLog() {
@@ -626,6 +610,65 @@ export function renderParagraphMemory() {
   panel.innerHTML = out;
 }
 
+// ──────────── Zone control (onglet Personnage) ────────────
+
+// Mini-badge verdict réutilisable.
+export function zoneVerdictBadge(verdict) {
+  const m = VERDICT_META[verdict] || VERDICT_META.neutre;
+  return `<span class="zone-verdict zone-verdict-${m.cls}" title="${m.label}">${m.icon} ${m.label}</span>`;
+}
+
+export function renderZoneControl() {
+  const box = el('zone-control');
+  if (!box) return;
+  const game = state.game;
+  if (!game) { box.innerHTML = ''; return; }
+
+  const zones = game.zones || [];
+  const active = getZone(game, game.activeZoneId);
+
+  // Bandeau "zone active"
+  let activeRow;
+  if (active) {
+    activeRow = html`<div class="zone-active is-on" style="--zone-color:${raw(active.color)}">
+      <span class="zone-dot"></span>
+      <span class="zone-active-label">Zone active : <strong>${active.name}</strong></span>
+      <button class="btn btn-small zone-close-btn" data-action="close-zone" title="Arrêter de rattacher les § à cette zone">Clôturer</button>
+    </div>`;
+  } else {
+    activeRow = html`<div class="zone-active">
+      <span class="zone-active-label zone-active-none">Aucune zone active — les § visités sont « Non classés »</span>
+    </div>`;
+  }
+
+  // Création
+  const createRow = html`<div class="zone-create">
+    <input type="text" id="new-zone-name" placeholder="Nom de zone (Forêt, Donjon…)" class="input-md" maxlength="40">
+    <button class="btn btn-small btn-primary" data-action="create-zone">+ Nouvelle zone</button>
+  </div>`;
+
+  // Puces des zones existantes (cliquables = reprendre), avec verdict cross-run.
+  let chips = '';
+  if (zones.length > 0) {
+    chips = '<div class="zone-chips">' + zones.map(z => {
+      const sum = summarizeZone(game, z.id);
+      const isActive = z.id === game.activeZoneId;
+      const m = VERDICT_META[sum.verdict] || VERDICT_META.neutre;
+      return html`<button class="zone-chip zone-verdict-${raw(m.cls)} ${raw(isActive ? 'is-active' : '')}"
+          style="--zone-color:${raw(z.color)}"
+          data-action="activate-zone" data-id="${z.id}"
+          title="Reprendre la zone « ${z.name} » — ${raw(m.label)} · ${sum.nums.length} §">
+        <span class="zone-dot"></span>
+        <span class="zone-chip-name">${z.name}</span>
+        <span class="zone-chip-count">${sum.nums.length}§</span>
+        <span class="zone-chip-verdict">${raw(m.icon)}</span>
+      </button>`;
+    }).join('') + '</div>';
+  }
+
+  box.innerHTML = `<div class="zone-control-header">🗺️ Zones d'exploration</div>${activeRow}${createRow}${chips}`;
+}
+
 // ──────────── Paragraph history (rich) ────────────
 
 export function renderParagraphs() {
@@ -640,7 +683,7 @@ export function renderParagraphs() {
   }
 
   const filter = (state.paragraphFilter || '').toLowerCase().trim();
-  // 'RUN' = vraie nouvelle run (affiche séparateur). null = back marker (silencieux).
+  // 'RUN' = vraie nouvelle run (affiche séparateur). 'BACK'/null = back marker (silencieux).
   let runNumber = 1;
   history.forEach((num, i) => {
     if (num === 'RUN') {
@@ -652,7 +695,7 @@ export function renderParagraphs() {
       container.appendChild(sep);
       return;
     }
-    if (num === null) {
+    if (num === null || num === 'BACK') {
       // Back marker — masqué pour ne pas polluer la liste
       return;
     }
@@ -663,6 +706,10 @@ export function renderParagraphs() {
       const haystack = `${num} ${meta.note || ''} ${sentiment}`.toLowerCase();
       if (!haystack.includes(filter)) return;
     }
+    const zone = meta.zone ? getZone(state.game, meta.zone) : null;
+    const zoneTag = zone
+      ? html`<span class="para-zone-tag" style="--zone-color:${raw(zone.color)}" title="Zone : ${zone.name}">${zone.name}</span>`
+      : '';
     const row = document.createElement('div');
     row.className = 'para-row';
     row.dataset.num = num;
@@ -670,6 +717,7 @@ export function renderParagraphs() {
       <span class="para-num">§${num}</span>
       <button class="sentiment-dot ${sentiment}" data-action="cycle-sentiment" data-num="${num}"
               title="Sentiment (clic pour changer)" aria-label="Changer sentiment"></button>
+      ${raw(zoneTag)}
       <input type="text" class="para-note" data-action="set-para-note" data-num="${num}"
              placeholder="Note rapide…" value="${meta.note || ''}">
       <button class="para-remove" data-action="remove-para-visit" data-idx="${i}"

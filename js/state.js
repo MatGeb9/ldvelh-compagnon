@@ -23,6 +23,112 @@ export function resetCharCreate() {
   state.startingEquipment = { gold: 0, provisions: 0, potions: [], objects: [] };
 }
 
+// Verdict d'une zone → présentation (icône + libellé + classe CSS).
+export const VERDICT_META = {
+  utile:  { icon: '✓', label: 'Utile',      cls: 'utile' },
+  danger: { icon: '✕', label: 'Danger',     cls: 'danger' },
+  mitige: { icon: '≈', label: 'Mitigé',     cls: 'mitige' },
+  neutre: { icon: '·', label: 'Inexploré',  cls: 'neutre' },
+};
+
+// Palette de couleurs des zones (cyclée à la création). Pensée pour le thème parchemin.
+export const ZONE_COLORS = [
+  '#7c4a2d', '#3d6b4f', '#5a4a78', '#8a5a1f',
+  '#2f6b78', '#8a3a52', '#566b2f', '#6b4a8a',
+];
+
+let _zoneSeq = 0;
+function nextZoneId() {
+  _zoneSeq += 1;
+  return `z${Date.now().toString(36)}_${_zoneSeq}`;
+}
+
+// Crée une zone, l'ajoute à game.zones et la rend active. Retourne la zone.
+export function createZone(game, name) {
+  if (!Array.isArray(game.zones)) game.zones = [];
+  const color = ZONE_COLORS[game.zones.length % ZONE_COLORS.length];
+  const zone = {
+    id: nextZoneId(),
+    name: (name || '').trim() || `Zone ${game.zones.length + 1}`,
+    color,
+    createdRun: game.runCount || 1,
+    createdTs: Date.now(),
+  };
+  game.zones.push(zone);
+  game.activeZoneId = zone.id;
+  return zone;
+}
+
+export function getZone(game, id) {
+  if (!id || !Array.isArray(game?.zones)) return null;
+  return game.zones.find(z => z.id === id) || null;
+}
+
+// Rattache le § `num` à la zone active (si une zone est active). No-op sinon :
+// on NE déclasse jamais un § déjà rangé quand aucune zone n'est active (revisite cross-run).
+export function tagParagraphWithActiveZone(game, num) {
+  if (!game || num == null || !game.activeZoneId) return;
+  if (!game.paragraphs) game.paragraphs = {};
+  if (!game.paragraphs[num]) {
+    game.paragraphs[num] = { sentiment: 'neutral', note: '', events: [], zone: null };
+  }
+  game.paragraphs[num].zone = game.activeZoneId;
+}
+
+// Agrège la mémoire cross-run d'une zone → verdict ("utile d'y retourner ?").
+// zoneId === null → pseudo-zone "Non classé" (§ sans zone).
+export function summarizeZone(game, zoneId) {
+  const paragraphs = game?.paragraphs || {};
+  const nums = Object.keys(paragraphs)
+    .filter(k => (paragraphs[k].zone ?? null) === zoneId)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  const events = [];
+  nums.forEach(n => (paragraphs[n].events || []).forEach(ev => events.push({ ...ev, para: n })));
+
+  const enemies = [], items = [], notes = [], deaths = [];
+  let goldNet = 0, provNet = 0, statNet = 0;
+  const runs = new Set();
+  events.forEach(ev => {
+    if (ev.run != null) runs.add(ev.run);
+    switch (ev.type) {
+      case 'enemy': enemies.push(ev); break;
+      case 'item': items.push(ev); break;
+      case 'note': notes.push(ev); break;
+      case 'death': deaths.push(ev); break;
+      case 'gold': goldNet += ev.data?.delta || 0; break;
+      case 'prov': provNet += ev.data?.delta || 0; break;
+      case 'stat': statNet += ev.data?.delta || 0; break;
+    }
+  });
+
+  // Sentiments des § de la zone
+  let pos = 0, neg = 0;
+  nums.forEach(n => {
+    const s = paragraphs[n].sentiment;
+    if (s === 'positive') pos++;
+    else if (s === 'negative') neg++;
+  });
+
+  const good = items.length + (goldNet > 0 ? 1 : 0) + (provNet > 0 ? 1 : 0) + (statNet > 0 ? 1 : 0) + pos;
+  const bad = deaths.length * 2 + (goldNet < 0 ? 1 : 0) + (statNet < 0 ? 1 : 0) + neg;
+
+  let verdict;
+  if (good === 0 && bad === 0) verdict = 'neutre';
+  else if (deaths.length > 0 && good === 0) verdict = 'danger';
+  else if (good > bad) verdict = 'utile';
+  else if (bad > good) verdict = 'danger';
+  else verdict = 'mitige';
+
+  return {
+    zoneId, nums, events, enemies, items, notes, deaths,
+    goldNet, provNet, statNet, pos, neg,
+    runs: [...runs].sort((a, b) => a - b),
+    good, bad, verdict,
+  };
+}
+
 export function resolveConfig(game = state.game) {
   if (!game) return null;
   return game.adventureConfig || getAdventureType(game.adventureType);
@@ -64,11 +170,12 @@ export function createGameState({ adventure, heroName, bookTitle, rolledStats, s
       objects: objects.map(o => ({ ...o })),
     },
     specialItems: [],
-    alerts: [],
     notes: '',
     currentParagraph: 1,
     paragraphHistory: [1],
-    paragraphs: { 1: { sentiment: 'neutral', note: '', events: [] } },
+    paragraphs: { 1: { sentiment: 'neutral', note: '', events: [], zone: null } },
+    zones: [],                    // [{ id, name, color, createdRun, createdTs }] — persiste cross-run
+    activeZoneId: null,           // zone "stylo" : tague les § visités tant qu'elle est active
     runCount: 1,
     diceLog: [],                  // [{ rolls, modifier, modifierLabel, total, label, ts }] — bounded to 10
     mapLockedPositions: {},       // { num: { x, y } } — manual node placements on the map
@@ -103,8 +210,8 @@ export function createGameState({ adventure, heroName, bookTitle, rolledStats, s
 }
 
 // Reset stats/inventory/combat/special for a new run on an existing save.
-// Keeps: heroName, bookTitle, statDefs, notes, paragraphs (sentiments + notes), paragraphHistory.
-// Adds a null marker in paragraphHistory to separate runs on the map.
+// Keeps: heroName, bookTitle, statDefs, notes, paragraphs (sentiments + notes + zone), paragraphHistory, zones.
+// Adds a 'RUN' marker in paragraphHistory to separate runs on the map.
 // options.reroll = true → fresh dice rolls for stats; false → reset to statsMax (heal full).
 export function startNewRun(game, { reroll = false } = {}) {
   const config = resolveConfig(game);
@@ -133,7 +240,6 @@ export function startNewRun(game, { reroll = false } = {}) {
   game.provisions = starting?.provisions ?? (config.defaultProvisions || 0);
   game.objects = (starting?.objects || []).map(o => ({ ...o }));
   game.specialItems = [];
-  game.alerts = [];
   if (starting?.potions && Array.isArray(starting.potions)) {
     game.potions = starting.potions.map(p => ({ ...p, used: 0 }));
   } else if (Array.isArray(config.potions) && config.potions.length > 0) {
@@ -174,13 +280,19 @@ export function startNewRun(game, { reroll = false } = {}) {
   game.currentParagraph = 1;
   if (!Array.isArray(game.paragraphHistory)) game.paragraphHistory = [];
   if (game.paragraphHistory.length > 0) {
-    // 'RUN' = boundary de vraie nouvelle run (distinct des marqueurs null des go-back)
+    // 'RUN' = boundary de vraie nouvelle run (distinct du marqueur 'BACK' des go-back)
     game.paragraphHistory.push('RUN');
   }
   game.paragraphHistory.push(1);
   if (!game.paragraphs) game.paragraphs = {};
   if (!game.paragraphs[1]) game.paragraphs[1] = { sentiment: 'neutral', note: '', events: [] };
   if (!Array.isArray(game.paragraphs[1].events)) game.paragraphs[1].events = [];
+
+  // Zones : PRÉSERVÉES (cross-run) — c'est tout l'intérêt du verdict cumulatif.
+  // On referme juste le "stylo" : la nouvelle run repart sans zone active, l'user
+  // réactive une zone (ou en crée une) au fil de l'exploration.
+  if (!Array.isArray(game.zones)) game.zones = [];
+  game.activeZoneId = null;
 
   // Run counter for UX
   game.runCount = (game.runCount || 1) + 1;
@@ -226,13 +338,15 @@ export function logParagraphEvent(num, type, data = {}) {
 }
 
 // Returns the set of paragraph numbers visited DIRECTLY AFTER `num` in any past traversal.
-// Respects run boundaries: a `null` marker breaks the adjacency.
+// Respects run/back boundaries: 'RUN', 'BACK' (and legacy null) markers break the adjacency
+// — only a numeric successor counts as a real neighbor.
 export function getNeighborsFromHistory(num) {
   const history = state.game?.paragraphHistory || [];
   const set = new Set();
   for (let i = 0; i < history.length - 1; i++) {
-    if (history[i] === num && history[i + 1] != null && history[i + 1] !== num) {
-      set.add(history[i + 1]);
+    const next = history[i + 1];
+    if (history[i] === num && typeof next === 'number' && next !== num) {
+      set.add(next);
     }
   }
   return [...set].sort((a, b) => a - b);
